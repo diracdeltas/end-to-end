@@ -23,6 +23,8 @@ goog.provide('e2e.ext.messages.ApiResponse');
 goog.provide('e2e.ext.messages.BridgeMessageRequest');
 goog.provide('e2e.ext.messages.BridgeMessageResponse');
 goog.provide('e2e.ext.messages.GetSelectionRequest');
+goog.provide('e2e.ext.messages.e2ebindRequest');
+goog.provide('e2e.ext.messages.e2ebindResponse');
 
 
 goog.scope(function() {
@@ -63,7 +65,8 @@ messages.BridgeMessageResponse;
  * selection is made.
  * @typedef {{
  *   editableElem: boolean,
- *   enableLookingGlass: boolean
+ *   enableLookingGlass: boolean,
+ *   composeGlass: (boolean|undefined)
  * }}
  */
 messages.GetSelectionRequest;
@@ -121,5 +124,32 @@ messages.ApiRequest.prototype.action;
  * }}
  */
 messages.ApiResponse;
+
+
+/**
+ * Defines the request message from the e2ebind API to a provider.
+ * @typedef {{
+ *   api: string,
+ *   source: string,
+ *   action: string,
+ *   args: (Object|undefined),
+ *   hash: string
+ * }}
+ */
+messages.e2ebindRequest;
+
+
+/**
+ * Defines the response message from the e2ebind API to a provider.
+ * @typedef {{
+ *   api: string,
+ *   source: string,
+ *   success: boolean,
+ *   action: string,
+ *   hash: string,
+ *   result: Object
+ * }}
+ */
+messages.e2ebindResponse;
 
 });  // goog.scope
