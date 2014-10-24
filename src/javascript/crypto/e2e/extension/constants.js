@@ -45,7 +45,7 @@ e2e.ext.constants.Actions = {
   GET_KEYRING_BACKUP_DATA: 'get_keyring_backup_data',
   RESTORE_KEYRING_DATA: 'restore_keyring_data',
   IMPORT_KEY: 'import_key',
-  LIST_KEYS: 'list_keys',
+  LIST_ALL_UIDS: 'list_all_uids',
   GET_KEYRING_UNLOCKED: 'get_keyring_unlocked',
 
   // Intended no-op. Used for closing the prompt UI when other visual elements

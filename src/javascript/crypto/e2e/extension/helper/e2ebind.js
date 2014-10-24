@@ -546,45 +546,41 @@ e2ebind.setDraft = function(args) {
 */
 e2ebind.validateSigner_ = function(signer, callback) {
   this.sendExtensionRequest_({
-    action: constants.Actions.LIST_KEYS,
+    action: constants.Actions.LIST_ALL_UIDS,
     content: 'private'
   }, function(response) {
-    var keys = response.content;
-    var valid = false;
-    if (keys && keys.indexOf('<' + signer + '>') !== -1) {
-      valid = true;
-    }
+    response.content = response.content || [];
+    var emails = utils.text.getValidEmailAddressesFromArray(response.content,
+                                                            true);
+    var valid = goog.array.contains(emails, signer)
     callback(valid);
   });
 };
 
 
 /**
-* Validates whether we have a public key these recipients.
+* Validates whether we have a public key for these recipients.
 * @param {Array.<string>} recipients The recipients we are checking
 * @param {!function} callback Callback to call with the result.
 * @private
 */
 e2ebind.validateRecipients_ = function(recipients, callback) {
   this.sendExtensionRequest_({
-    action: constants.Actions.LIST_KEYS,
+    action: constants.Actions.LIST_ALL_UIDS,
     content: 'public'
   }, function(response) {
-    var keys = response.content;
-    if (!keys) {
-      return;
-    }
+    response.content = response.content || [];
+    var emails = utils.text.getValidEmailAddressesFromArray(response.content,
+                                                            true);
     var results = [];
     goog.array.forEach(recipients, function(recipient) {
-      var valid = false;
-      if (keys.indexOf('<' + recipients + '>') !== -1) {
-        valid = true;
-      }
+      var valid = goog.array.contains(emails, recipient);
       results.push({valid: valid, recipient: recipient});
     });
     callback(results);
   });
 };
+
 
 /**
 * Sends a request to the launcher to perform some action.

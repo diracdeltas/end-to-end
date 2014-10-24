@@ -264,12 +264,21 @@ api.Api.prototype.executeAction_ = function(callback, req) {
             });
           });
       break;
-    case constants.Actions.LIST_KEYS:
+    case constants.Actions.LIST_ALL_UIDS:
       outgoing.error = this.runWrappedProcessor_(
           /**@this api.Api */ function() {
             this.pgpCtx_.getAllKeys(incoming.content === 'private').addCallback(
                 function(result) {
-                  outgoing.content = result;
+                  var uids = [];
+                  for (var keyId in result) {
+                    var keys = result[keyId];
+                    goog.array.forEach(keys, function(key) {
+                      if (key && key.uids) {
+                        goog.array.extend(uids, key.uids);
+                      }
+                    })
+                  }
+                  outgoing.content = uids;
                   callback(outgoing);
                 }).addErrback(function(error) {
                   outgoing.error = error.toString();

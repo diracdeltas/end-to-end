@@ -255,6 +255,29 @@ function testImportKeyAndGetDescription() {
 }
 
 
+function testListAllUids() {
+  populatePgpKeys();
+  api.pgpCtx_.importKey(function() {}, PUBLIC_KEY_ASCII_2);
+  asyncTestCase.waitForAsync('Listing public keys');
+  api.executeAction_(function(response) {
+    assertContains('test 4', response.content);
+    assertContains('Drew Hintz <adhintz@google.com>', response.content);
+    asyncTestCase.waitForAsync('Listing private keys');
+    api.executeAction_(function(response) {
+      assertContains('test 4', response.content);
+      assertNotContains('Drew Hintz <adhintz@google.com>', response.content);
+      asyncTestCase.continueTesting();
+    }, {
+      content: 'private',
+      action: constants.Actions.LIST_ALL_UIDS
+    });
+  }, {
+    content: 'public',
+    action: constants.Actions.LIST_ALL_UIDS
+  });
+}
+
+
 function testThrottle() {
   stubs.set(api, 'runWrappedProcessor_', mockControl.createFunctionMock());
   stubs.set(
@@ -297,6 +320,19 @@ function testLockedKeyring() {
   mockControl.$replayAll();
   api.executeAction_(callbackMock, {});
   mockControl.$verifyAll();
+}
+
+
+function testGetKeyringUnlocked() {
+  stubs.setPath(
+    'window.launcher.hasPassphrase', mockControl.createFunctionMock());
+  window.launcher.hasPassphrase().$returns(true);
+  mockControl.$replayAll();
+  api.executeAction_(function(response) {
+    assertTrue(response.content);
+  }, {
+    action: constants.Actions.GET_KEYRING_UNLOCKED
+  });
 }
 
 
