@@ -1,16 +1,19 @@
-// Copyright 2014 Yahoo Inc. All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/**
+ * @license
+ * Copyright 2014 Yahoo Inc. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 /**
  * @fileoverview Provides a wrapper around the E2E bind API for interacting
  *   with Yahoo Mail.
@@ -21,7 +24,6 @@
 goog.provide('e2e.ext.e2ebind');
 
 goog.require('e2e.ext.constants');
-goog.require('e2e.ext.ui.ComposeGlassWrapper');
 goog.require('e2e.ext.ui.GlassWrapper');
 goog.require('e2e.ext.utils.text');
 goog.require('e2e.openpgp.asciiArmor');
@@ -30,7 +32,6 @@ goog.require('goog.array');
 goog.require('goog.events');
 goog.require('goog.events.EventType');
 goog.require('goog.string');
-goog.require('goog.structs.Map');
 
 
 goog.scope(function() {
@@ -73,7 +74,7 @@ e2ebind.MessagingTable_ = function() {
  * Generates a short, non-cryptographically random string.
  * @return {string}
  */
-e2ebind.MessagingTable_.getRandomString = function() {
+e2ebind.MessagingTable_.prototype.getRandomString = function() {
   return goog.string.getRandomString();
 };
 
@@ -84,7 +85,7 @@ e2ebind.MessagingTable_.getRandomString = function() {
  * @param {function=} callback The callback associated with the entry.
  * @return {string} The hash value.
  */
-e2ebind.MessagingTable_.add = function(action, callback) {
+e2ebind.MessagingTable_.prototype.add = function(action, callback) {
   var hash = this.getRandomString();
   while (this.table[hash]) {
     // Ensure unqiueness.
@@ -105,7 +106,7 @@ e2ebind.MessagingTable_.add = function(action, callback) {
 * @return {{action:string,callback:function=}} The record associated with
 *   the hash, or null if not found
 */
-e2ebind.MessagingTable_.get = function(hash, action) {
+e2ebind.MessagingTable_.prototype.get = function(hash, action) {
   var result = null;
   if (this.table[hash] && this.table[hash].action === action) {
     result = this.table[hash];
@@ -121,12 +122,15 @@ e2ebind.MessagingTable_.get = function(hash, action) {
 e2ebind.start = function() {
   var uri = new goog.Uri(window.location.href);
   // Use the version of YMail that has the endtoend module included.
-  if (!uri.getParameterValue('endtoend')) {
+  if (utils.text.isYmailOrigin(window.location.href) &&
+      !uri.getParameterValue('endtoend')) {
     uri.setParameterValue('endtoend', 1);
     uri.setParameterValue('composev3', 0);
     window.location.href = uri.toString();
     return;
   }
+
+  this.messagingTable = new e2ebind.MessagingTable_();
 
   window.onmessage = goog.bind(function(response) {
     var result;
@@ -172,12 +176,12 @@ e2ebind.start = function() {
           draft.from = '<' + window.config.signer + '>';
 
           e2ebind.hasDraft(goog.bind(function(hasDraftResult) {
-            if (hasDraftResult.has_draft) {
+            if (hasDraftResult) {
               e2ebind.getDraft(goog.bind(function(getDraftResult) {
                 draft.body = e2e.openpgp.asciiArmor.
                   extractPgpBlock(getDraftResult.body);
                 draft.to = getDraftResult.to;
-                draft.cc = getDraftResult.from;
+                draft.cc = getDraftResult.cc;
                 draft.bcc = getDraftResult.bcc;
                 draft.subject = getDraftResult.subject;
                 // Compose glass implementation will be in a future patch.
@@ -218,7 +222,7 @@ e2ebind.sendRequest = function(action, args, callback) {
     source: 'E2E',
     action: action,
     args: args,
-    hash: this.MessagingTable_.add(action, callback)
+    hash: this.messagingTable.add(action, callback)
   });
 
   window.console.log('e2ebind sending message to page', reqObj);
@@ -253,7 +257,7 @@ e2ebind.sendResponse_ = function(result, request, success) {
 * @private
 */
 e2ebind.handleProviderResponse_ = function(response) {
-  var request = this.MessagingTable_.get(response.hash, response.action);
+  var request = this.messagingTable.get(response.hash, response.action);
 
   if (!request) {
     return;
@@ -432,6 +436,7 @@ e2ebind.installReadGlass_ = function(elem, text, mode, selector) {
 *   (needed for resizing/scrolling)
 * @private
 */
+/*
 e2ebind.installComposeGlass_ = function(elem, draft, mode) {
   var DOMelem = elem;
 
@@ -444,7 +449,7 @@ e2ebind.installComposeGlass_ = function(elem, draft, mode) {
     return;
   }
 
-  var hash = this.MessagingTable_.getRandomString();
+  var hash = this.messagingTable.getRandomString();
   var glassWrapper = new ui.ComposeGlassWrapper(elem, draft, mode, hash);
   window.helper.registerDisposable(glassWrapper);
   glassWrapper.installGlass();
@@ -461,6 +466,7 @@ e2ebind.installComposeGlass_ = function(elem, draft, mode) {
   // Listen for when the glass should be removed
   chrome.runtime.onMessage.addListener(closeHandler);
 };
+*/
 
 
 /**
@@ -510,10 +516,10 @@ e2ebind.getDraft = function(callback) {
 e2ebind.hasDraft = function(callback) {
   this.sendRequest(constants.e2ebind.responseActions.HAS_DRAFT, null,
                    function(data) {
-    var result = {has_draft: false};
+    var result = false;
 
     if (data.success && data.result.has_draft) {
-      result.has_draft = true;
+      result = true;
     }
 
     callback(result);

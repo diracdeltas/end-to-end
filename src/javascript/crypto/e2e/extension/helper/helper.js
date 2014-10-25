@@ -187,7 +187,7 @@ ext.Helper.prototype.setGmonkeyValue_ = function(msg) {
  *     the extension.
  * @private
  */
-ext.Helper.prototype.setProviderValue_ = function(msg) {
+ext.Helper.prototype.setE2ebindValue_ = function(msg) {
   if (msg.response && msg.origin == this.getOrigin_()) {
     e2ebind.setDraft({
       to: msg.recipients,
@@ -208,9 +208,6 @@ ext.Helper.prototype.setProviderValue_ = function(msg) {
 ext.Helper.prototype.runOnce = function() {
   chrome.runtime.onMessage.addListener(this.getValueHandler_);
 
-  // Start the e2ebind API. Currently only used on Yahoo Mail.
-  e2ebind.start();
-
   if (this.isGmail_() && !window.ENABLED_LOOKING_GLASS) {
     this.activeViewListenerKey_ = goog.events.listen(
         document.body,
@@ -221,6 +218,8 @@ ext.Helper.prototype.runOnce = function() {
 
     /** @type {boolean} */
     window.ENABLED_LOOKING_GLASS = true;
+  } else if (this.isYmail_()) {
+    e2ebind.start();
   }
 };
 
@@ -328,7 +327,7 @@ ext.Helper.prototype.getSelectedContentGmonkey_ = function(selectionRequest,
 ext.Helper.prototype.getSelectedContentE2ebind_ = function(selectionRequest,
                                                            callback) {
   // Add set_draft handler
-  this.attachSetValueHandler_(goog.bind(this.setProviderValue_, this));
+  this.attachSetValueHandler_(goog.bind(this.setE2ebindValue_, this));
 
   // ComposeGlass already has draft, so abort early
   if (selectionRequest.composeGlass) {
@@ -342,7 +341,7 @@ ext.Helper.prototype.getSelectedContentE2ebind_ = function(selectionRequest,
 
   // Check if we have a draft
   e2ebind.hasDraft(goog.bind(function(has_draft_result) {
-    if (has_draft_result.has_draft) {
+    if (has_draft_result) {
       // We have a draft, get_draft from it
       e2ebind.getDraft(goog.bind(function(get_draft_result) {
         var selectionBody = e2e.openpgp.asciiArmor
