@@ -117,6 +117,94 @@ e2ebind.MessagingTable_.prototype.get = function(hash, action) {
 
 
 /**
+ * onmessage event listener.
+ * @param {!Object} response The message sent from the page via
+ *   window.postMessage.
+ * @private
+ */
+e2ebind.messageHandler_ = function(response) {
+  var result;
+  try {
+    /** @type {{api:string,hash:string,action:string,source:string}} */
+    var responseObj = window.JSON.parse(response.data);
+    if (response.source !== window.self ||
+        response.origin !== window.location.origin ||
+        responseObj.api !== 'e2ebind' ||
+        responseObj.source !== 'E2E') {
+      return;
+    }
+
+    if (data.action.toUpperCase() in constants.e2ebind.requestActions) {
+      e2ebind.handleProviderRequest_(data);
+    } else if (
+      data.action.toUpperCase() in constants.e2ebind.responseActions) {
+      e2ebind.handleProviderResponse_(data);
+    }
+  } catch (e) {
+    return;
+  }
+};
+
+
+/**
+ * Custom click event handler for e2ebind page elements.
+ * @param {Element} e The element that was clicked.
+ * @private
+ */
+e2ebind.clickHandler_ = function(e) {
+  var elt = e.target;
+
+  if (elt.id === constants.ElementId.E2EBIND_ICON) {
+    e2ebind.sendExtensionRequest_({
+      action: constants.Actions.GET_KEYRING_UNLOCKED
+    }, goog.bind(function(response) {
+      if (response.error) {
+        // Can't install compose glass if the keyring is locked
+        window.alert(chrome.i18n.getMessage('glassKeyringLockedError'));
+      } else {
+        // Get the compose window associated with the clicked icon
+        var composeElem = goog.dom.getAncestorByTagNameAndClass(elt,
+                                                               'div',
+                                                               'compose');
+        var draft = {};
+        draft.from = window.config.signer ? '<' + window.config.signer + '>' :
+          '';
+
+        e2ebind.hasDraft(goog.bind(function(hasDraftResult) {
+          if (hasDraftResult) {
+            e2ebind.getDraft(goog.bind(function(getDraftResult) {
+              draft.body = e2e.openpgp.asciiArmor.
+                extractPgpBlock(getDraftResult.body);
+              draft.to = getDraftResult.to;
+              draft.cc = getDraftResult.cc;
+              draft.bcc = getDraftResult.bcc;
+              draft.subject = getDraftResult.subject;
+              // Compose glass implementation will be in a future patch.
+              //e2ebind.installComposeGlass_(composeElem, draft);
+            }, this));
+          } else {
+            e2ebind.getCurrentMessage(goog.bind(function(result) {
+              var DOMelem = document.querySelector(result.elem);
+              if (result.text) {
+                draft.body = result.text;
+              } else if (DOMelem) {
+                draft.body = e2e.openpgp.asciiArmor.extractPgpBlock(
+                  goog.isDef(DOMelem.lookingGlass) ?
+                  DOMelem.lookingGlass.getOriginalContent() :
+                  DOMelem.innerText
+                );
+              }
+              //e2ebind.installComposeGlass_(composeElem, draft);
+            }, this));
+          }
+        }, this));
+      }
+    }, this));
+  }
+};
+
+
+/**
 * Start listening for responses and requests to/from the provider.
 */
 e2ebind.start = function() {
@@ -132,81 +220,24 @@ e2ebind.start = function() {
 
   this.messagingTable = new e2ebind.MessagingTable_();
 
-  window.onmessage = goog.bind(function(response) {
-    var result;
-    try {
-      /** @type {{api:string,hash:string,action:string,source:string}} */
-      var responseObj = window.JSON.parse(response.data);
-      if (response.source !== window.self ||
-          response.origin !== window.location.origin ||
-          responseObj.api !== 'e2ebind' ||
-          responseObj.source !== 'E2E') {
-        return;
-      }
+  goog.events.listen(window, goog.events.EventType.CLICK,
+                     e2ebind.clickHandler_, true);
+  window.addEventListener('message', e2ebind.messageHandler_);
+};
 
-      if (data.action.toUpperCase() in constants.e2ebind.requestActions) {
-        this.handleProviderRequest_(data);
-      } else if (
-        data.action.toUpperCase() in constants.e2ebind.responseActions) {
-        this.handleProviderResponse_(data);
-      }
-    } catch (e) {
-      return;
-    }
-  }, this);
 
-  // Listen for when the encryption icon is clicked in YMail.
-  goog.events.listen(window, goog.events.EventType.CLICK, goog.bind(
-    function(e) {
-    var elt = e.target;
-
-    if (elt.id === 'endtoend') {
-      this.sendExtensionRequest_({
-        action: constants.Actions.GET_KEYRING_UNLOCKED
-      }, goog.bind(function(response) {
-        if (response.error) {
-          // Can't install compose glass if the keyring is locked
-          window.alert(chrome.i18n.getMessage('glassKeyringLockedError'));
-        } else {
-          // Get the compose window associated with the clicked icon
-          var composeElem = goog.dom.getAncestorByTagNameAndClass(elt,
-                                                                 'div',
-                                                                 'compose');
-          var draft = {};
-          draft.from = '<' + window.config.signer + '>';
-
-          e2ebind.hasDraft(goog.bind(function(hasDraftResult) {
-            if (hasDraftResult) {
-              e2ebind.getDraft(goog.bind(function(getDraftResult) {
-                draft.body = e2e.openpgp.asciiArmor.
-                  extractPgpBlock(getDraftResult.body);
-                draft.to = getDraftResult.to;
-                draft.cc = getDraftResult.cc;
-                draft.bcc = getDraftResult.bcc;
-                draft.subject = getDraftResult.subject;
-                // Compose glass implementation will be in a future patch.
-                //e2ebind.installComposeGlass_(composeElem, draft);
-              }, this));
-            } else {
-              e2ebind.getCurrentMessage(goog.bind(function(result) {
-                var DOMelem = document.querySelector(result.elem);
-                if (result.text) {
-                  draft.body = result.text;
-                } else if (DOMelem) {
-                  draft.body = e2e.openpgp.asciiArmor.extractPgpBlock(
-                    goog.isDef(DOMelem.lookingGlass) ?
-                    DOMelem.lookingGlass.getOriginalContent() :
-                    DOMelem.innerText
-                  );
-                }
-                //e2ebind.installComposeGlass_(composeElem, draft);
-              }, this));
-            }
-          }, this));
-        }
-      }, this));
-    }
-  }, this), true);
+/**
+ * Stops the e2ebind API
+ * @private
+ */
+e2ebind.stop_ = function() {
+  window.removeEventListener('message', e2ebind.messageHandler_);
+  e2ebind.messagingTable = undefined;
+  e2ebind.started_ = false;
+  window.config = {};
+  window.valid = undefined;
+  goog.events.unlisten(window, goog.events.EventType.CLICK,
+                       e2ebind.clickHandler_);
 };
 
 
@@ -558,7 +589,7 @@ e2ebind.validateSigner_ = function(signer, callback) {
     response.content = response.content || [];
     var emails = utils.text.getValidEmailAddressesFromArray(response.content,
                                                             true);
-    var valid = goog.array.contains(emails, signer)
+    var valid = goog.array.contains(emails, signer);
     callback(valid);
   });
 };
