@@ -224,3 +224,35 @@ e2e.ext.constants.BackupCode = {
  * @const
  */
 e2e.ext.constants.BACKUP_CODE_LENGTH = 24;
+
+
+/**
+ * MIME constants used by the extension.
+ * @enum {string}
+ */
+e2e.ext.constants.Mime = {
+  // Header names
+  CONTENT_TYPE: 'Content-type',
+  CONTENT_TRANSFER_ENCODING: 'Content-Transfer-Encoding',
+  MIME_VERSION: 'Mime-Version',
+  CONTENT_DISPOSITION: 'Content-Disposition',
+
+  // Content fields
+  VERSION_CONTENT: 'Version: 1',
+
+  // Content Types
+  PLAINTEXT: 'text/plain',
+  MULTIPART_ENCRYPTED:
+    'multipart/encrypted; protocol=application/pgp-encrypted',
+  ENCRYPTED: 'application/pgp-encrypted',
+  OCTET_STREAM: 'application/octet-stream',
+  MULTIPART_MIXED: 'multipart/mixed',
+
+  // Content Transfer Encodings
+  SEVEN_BIT: '7bit',
+  QUOTED_PRINTABLE: 'quoted_printable',
+  BASE64: 'base64',
+
+  // Content dispositions
+  ATTACHMENT: 'attachment'
+};
