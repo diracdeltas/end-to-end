@@ -23,6 +23,7 @@ goog.provide('e2e.ext.constants.Actions');
 goog.provide('e2e.ext.constants.BackupCode');
 goog.provide('e2e.ext.constants.CssClass');
 goog.provide('e2e.ext.constants.ElementId');
+goog.provide('e2e.ext.constants.Mime');
 goog.provide('e2e.ext.constants.StorageKey');
 
 
@@ -243,7 +244,7 @@ e2e.ext.constants.Mime = {
   // Content Types
   PLAINTEXT: 'text/plain',
   MULTIPART_ENCRYPTED:
-    'multipart/encrypted; protocol=application/pgp-encrypted',
+      'multipart/encrypted; protocol=application/pgp-encrypted',
   ENCRYPTED: 'application/pgp-encrypted',
   OCTET_STREAM: 'application/octet-stream',
   MULTIPART_MIXED: 'multipart/mixed',

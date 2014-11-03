@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-
 /**
  * @fileoverview PGP/MIME email builder (RFC 2822, RFC 3156).
  * @author yzhu@yahoo-inc.com (Yan Zhu)
@@ -22,17 +21,15 @@
 
 goog.provide('e2e.ext.mime.PgpMail');
 
-goog.require('e2e.openpgp.ContextImpl');
-goog.require('e2e.ext.constants');
-goog.require('e2e.ext.messages');
-goog.require('e2e.ext.mime.types');
+goog.require('e2e.ext.constants.Actions');
+goog.require('e2e.ext.constants.Mime');
+goog.require('e2e.ext.mime.MimeNode');
 goog.require('goog.array');
 
 
 goog.scope(function() {
 var ext = e2e.ext;
 var constants = e2e.ext.constants;
-var messages = e2e.ext.messages;
 var mime = e2e.ext.mime;
 
 
@@ -61,8 +58,9 @@ ext.mime.PgpMail = function(content, actionExecutor, currentUser,
 
 /**
  * Processes email into an encrypted MIME tree.
+ * @param {!function(string)} callback
  */
-ext.mime.PgpMail.buildSignedEncryptedTree = function(callback) {
+ext.mime.PgpMail.buildSignedEncrypted = function(callback) {
   var mimetree = this.buildMimeTree_(this.originalContent);
   var request = /** @type {!messages.ApiRequest} */ ({
     action: constants.Actions.ENCRYPT_SIGN,
@@ -80,36 +78,39 @@ ext.mime.PgpMail.buildSignedEncryptedTree = function(callback) {
 
 
 /**
- * Create a plaintext MIME tree for the email.
+ * Create a plaintext serialized MIME tree for the email.
  * @param {!mime.types.MailContent} content The plaintext content of the email.
  * @return {string}
+ * @private
  */
 ext.mime.PgpMail.buildMimeTree_ = function(content) {
-  var rootNode = new mime.MimeNode();
+  var rootNode;
+
   if (!content.attachments || content.attachments.length === 0) {
     // Create a single plaintext node. TODO: Support 7-bit transfer encoding.
-    rootNode.setHeader(constants.Mime.CONTENT_TYPE, constants.Mime.PLAINTEXT);
-    rootNode.setHeader(constants.Mime.CONTENT_TRANSFER_ENCODING,
-                       constants.Mime.SEVEN_BIT);
+    rootNode = new mime.MimeNode({multipart: false,
+      contentType: constants.Mime.PLAINTEXT,
+      contentTransferEncoding:
+          constants.Mime.SEVEN_BIT});
     rootNode.setContent(content.body);
   } else {
-    rootNode.setHeader(constants.Mime.CONTENT_TYPE,
-                       constants.Mime.MULTIPART_MIXED);
+    // Create a multipart node with children for body and attachments.
+    rootNode = new mime.MimeNode({multipart: true,
+      contentType: constants.Mime.MULTIPART_MIXED});
 
-    var textNode = rootNode.createChild(constants.Mime.PLAINTEXT);
-    textNode.setHeader(constants.Mime.CONTENT_TRANSFER_ENCODING,
-                       constants.Mime.SEVEN_BIT);
+    var textNode = rootNode.addChild({multipart: false,
+      contentType: constants.Mime.PLAINTEXT,
+      contentTransferEncoding:
+                                        constants.Mime.SEVEN_BIT});
     textNode.setContent(content.body);
 
     goog.array.forEach(content.attachments, function(attachment) {
-      var contentType = constants.Mime.OCTET_STREAM;
-      var ctEncoding = constants.Mime.BASE64;
       var filename = attachment.filename;
+      var options = {multipart: false,
+        contentType: constants.Mime.OCTET_STREAM,
+        contentTransferEncoding: constants.Mime.BASE64};
 
-      var attachmentNode = rootNode.createChild(contentType, filename);
-      attachmentNode.setHeader(constants.Mime.CONTENT_TYPE, contentType);
-      attachmentNode.setHeader(constants.Mime.CONTENT_TRANSFER_ENCODING,
-                               ctEncoding);
+      var attachmentNode = rootNode.addChild(options, filename);
       attachmentNode.setContent(attachment.content);
     });
   }
@@ -118,28 +119,33 @@ ext.mime.PgpMail.buildMimeTree_ = function(content) {
 
 
 /**
- * Builds a MIME tree for PGP-encrypted content, according to RFC 3156.
+ * Builds a serialized MIME tree for PGP-encrypted content, per RFC 3156.
  * @param {string} encrypted The PGP-encrypted content.
  * @return {string}
+ * @private
  */
 ext.mime.PgpMail.buildEncryptedMimeTree_ = function(encrypted) {
   // Build the top-level node
-  var rootNode = new mime.MimeNode();
-  rootNode.setHeader(constants.Mime.CONTENT_TYPE,
-                     constants.Mime.MULTIPART_ENCRYPTED);
-  rootNode.setHeader(constants.Mime.CONTENT_TRANSFER_ENCODING,
-                     constants.Mime.SEVEN_BIT);
+  var rootNode = new mime.MimeNode({multipart: true,
+    contentType:
+        constants.Mime.MULTIPART_ENCRYPTED,
+    contentTransferEncoding:
+        constants.Mime.SEVEN_BIT});
 
   // Set the required version info.
-  var versionNode = rootNode.createChild(constants.Mime.PGP_ENCRYPTED);
-  versionNode.setHeader(constants.Mime.CONTENT_TRANSFER_ENCODING,
-                        constants.Mime.SEVEN_BIT);
+  var versionNode = rootNode.addChild({multipart: false,
+    contentType:
+        constants.Mime.PGP_ENCRYPTED,
+    contentTransferEncoding:
+        constants.Mime.SEVEN_BIT});
   versionNode.setContent(constants.Mime.VERSION_CONTENT);
 
   // Set the ciphertext
-  var contentNode = rootNode.createChild(constants.Mime.OCTET_STREAM);
-  contentNode.setHeader(constants.Mime.CONTENT_TRANSFER_ENCODING,
-                        constants.Mime.SEVEN_BIT);
+  var contentNode = rootNode.addChild({multipart: false,
+    contentType:
+        constants.Mime.OCTET_STREAM,
+    contentTransferEncoding:
+        constants.Mime.SEVEN_BIT});
   contentNode.setContent(encrypted);
 
   return rootNode.buildMessage();

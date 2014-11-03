@@ -19,51 +19,68 @@
  * @author yzhu@yahoo-inc.com (Yan Zhu)
  */
 
-goog.provide('e2e.ext.extension.mime.Node');
+goog.provide('e2e.ext.mime.MimeNode');
 
-goog.require('e2e.ext.constants');
+goog.require('e2e.ext.constants.Mime');
+goog.require('e2e.ext.constants.mime');
+goog.require('goog.array');
+goog.require('goog.crypt.base64');
 goog.require('goog.object');
 goog.require('goog.string');
 
 goog.scope(function() {
 var ext = e2e.ext;
 var constants = e2e.ext.constants;
-var mime = e2e.ext.mime;
 
 
 
 /**
  * Constructor for a MIME tree node.
- * @param {e2e.ext.mime.MimeNode} opt_parent The parent node.
- * @param {string=} opt_contentType The contentType of the node, if known.
+ * @param {{
+ *   contentType: string,
+ *   contentTransferEncoding: (string|undefined),
+ *   multipart: boolean
+ * }} options Options to initialize for the node.
+ * @param {e2e.ext.mime.MimeNode=} opt_parent The parent node.
  * @param {string=} opt_filename Name of the file, if the node is an attachment.
+ *   to false.
  * @constructor
  */
-ext.mime.MimeNode = function(opt_parent, opt_contentType, opt_filename) {
-  options = options || {};
-
+ext.mime.MimeNode = function(options, opt_parent, opt_filename) {
   this.parent = opt_parent || this;
   this.filename = opt_filename;
 
+  this.multipart_ = options.multipart;
   this.headers_ = {};
   this.content_ = null;
-  this.boundary_ = '';
 
-  if (opt_contentType) {
-    this.setHeader(constants.Mime.CONTENT_TYPE, opt_contentType);
+  // TODO: Strictly ensure that the boundary value doesn't coincide with
+  //   any string in the email content and headers.
+  this.boundary_ = goog.string.getRandomString() +
+      Math.floor(Date.now() / 1000).toString();
+
+  this.setHeader_(constants.Mime.CONTENT_TYPE, options.contentType);
+
+  if (options.contentTransferEncoding) {
+    this.setHeader_(constants.Mime.CONTENT_TRANSFER_ENCODING,
+                    options.contentTransferEncoding);
   }
 };
 
 
 /**
  * Adds a child to a MIME node.
- * @param {string=} opt_contentType The contentType of the node, if known.
+ * @param {{
+ *   contentType: string,
+ *   contentTransferEncoding: (string|undefined),
+ *   multipart: boolean
+ * }} options Options to initialize for the node.
  * @param {string=} opt_filename Name of the file, if one exists.
  * @return {e2e.ext.mime.MimeNode}
  */
-ext.mime.MimeNode.prototype.createChild = function(opt_contentType,
-                                                   opt_filename) {
-  var node = new ext.mime.MimeNode(this, opt_contentType, opt_filename);
+ext.mime.MimeNode.prototype.addChild = function(options, opt_filename) {
+  var node = new ext.mime.MimeNode(options, this, opt_filename);
+  this.children_.push(node);
   return node;
 };
 
@@ -72,18 +89,25 @@ ext.mime.MimeNode.prototype.createChild = function(opt_contentType,
  * Sets a MIME header.
  * @param {string} key Name of the header.
  * @param {string} value Value of the header.
+ * @private
  */
-ext.mime.prototype.setHeader = function(key, value) {
+ext.mime.MimeNode.prototype.setHeader_ = function(key, value) {
   goog.object.set(this.headers_, key, value);
 };
 
 
 /**
- * Adds parameters to a MIME header value.
- * @param {string} value The original value of the header.
+ * Adds parameters to a MIME header. Note: This will not replace a param
+ *   if it already exists.
+ * @param {string} headerName The name of the header.
  * @param {Object} params The parameter key-value pairs to add.
+ * @param {string} value Default value of the header if one doesn't exist.
+ * @private
  */
-ext.mime.prototype.addParams_ = function(value, params) {
+ext.mime.MimeNode.prototype.addHeaderParams_ = function(headerName, params,
+                                                        value) {
+  var value = goog.object.get(this.headers_, headerName, value);
+
   var paramsArray = [];
   goog.object.forEach(params, function(paramValue, paramName) {
     if (paramName === 'filename') {
@@ -94,17 +118,12 @@ ext.mime.prototype.addParams_ = function(value, params) {
     paramsArray.push(paramName + '=' + paramValue);
   });
 
-  return value + '; ' + paramsArray.join('; ');
-};
+  if (paramsArray.length !== 0) {
+    value = value + '; ' + paramsArray.join('; ');
+  }
 
+  this.setHeader_(headerName, value);
 
-/**
- * Sets content disposition for attachments.
- */
-ext.mime.prototype.setContentDisposition_ = function() {
-  this.setHeader(constants.Mime.CONTENT_DISPOSITION,
-                 this.addParams_(constants.Mime.ATTACHMENT,
-                                {filename: this.filename})); 
 };
 
 
@@ -112,7 +131,7 @@ ext.mime.prototype.setContentDisposition_ = function() {
  * Sets the content.
  * @param {(string|!e2e.byteArray)} content The content to set
  */
-ext.mime.prototype.setContent = function(content) {
+ext.mime.MimeNode.prototype.setContent = function(content) {
   this.content_ = content;
 };
 
@@ -121,46 +140,50 @@ ext.mime.prototype.setContent = function(content) {
  * Builds an RFC 2822 message from the node.
  * @return {string}
  */
-ext.mime.prototype.buildMessage = function() {
+ext.mime.MimeNode.prototype.buildMessage = function() {
   var lines = [];
   var contentParams = {};
-  var multipart; // TODO: determine if a msg is multipart
-
   var transferEncoding =
-    this.headers_[constants.Mime.CONTENT_TRANSFER_ENCODING];
+      this.headers_[constants.Mime.CONTENT_TRANSFER_ENCODING];
   var contentType = this.headers_[constants.Mime.CONTENT_TYPE];
 
+  // Set required header fields
   if (this.filename && !this.headers_[constants.Mime.CONTENT_DISPOSITION]) {
-    this.setContentDisposition_();
-  } else if (goog.typeof(this.content) === 'string') {
+    // Set the correct content disposition header for attachments.
+    this.addHeaderParams_(constants.Mime.CONTENT_DISPOSITION,
+                          {filename: this.filename},
+                          constants.Mime.ATTACHMENT);
+  } else if (this.content_ && goog.typeof(this.content_) === 'string') {
+    // TODO: Support other charsets.
     contentParams['charset'] = 'utf-8';
-  } else if (multipart) {
-    this.boundary_ = goog.string.getRandomString();
+  } else if (this.multipart_) {
+    // Multipart messages need to specify a boundary
     contentParams['boundary'] = this.boundary_;
   }
-  this.setHeader(constants.Mime.CONTENT_TYPE,
-                 this.addParams_(contentType, contentParams));
+  this.addHeaderParams_(constants.mime.CONTENT_TYPE, contentParams,
+                        contentType);
 
   goog.object.forEach(this.headers_, function(headerValue, headerName) {
-    lines.push([headerName, headerValue].join(':'));
+    // TODO: Wrap lines
+    lines.push([headerName, headerValue].join(': '));
   });
 
   lines.push('');
 
-  if (this.content) {
-    if (transferEncoding === constants.Mime.BASE64 || 
-        goog.typeof(this.content) !=== 'string') {
-      lines.push(goog.typeof(this.content) === 'string' ?
-                 goog.crypt.base64.encodeString(this.content) :
-                 goog.crypt.base64.encodeByteArray(this.content));
+  if (this.content_) {
+    if (transferEncoding === constants.Mime.BASE64 ||
+        goog.typeof(this.content_) !== 'string') {
+      lines.push(goog.typeof(this.content_) === 'string' ?
+                 goog.crypt.base64.encodeString(this.content_) :
+                 goog.crypt.base64.encodeByteArray(this.content_));
     } else {
-      lines.push(this.content);
+      lines.push(this.content_);
     }
   }
 
-  if (multipart) {
+  if (this.multipart_) {
     lines.push('');
-    goog.array.forEach(this.childNodes_, function(node) {
+    goog.array.forEach(this.children_, function(node) {
       lines.push('--' + this.boundary_);
       lines.push(node.buildMessage());
     });
