@@ -233,7 +233,7 @@ e2e.ext.constants.BACKUP_CODE_LENGTH = 24;
  */
 e2e.ext.constants.Mime = {
   // Header names
-  CONTENT_TYPE: 'Content-type',
+  CONTENT_TYPE: 'Content-Type',
   CONTENT_TRANSFER_ENCODING: 'Content-Transfer-Encoding',
   MIME_VERSION: 'Mime-Version',
   CONTENT_DISPOSITION: 'Content-Disposition',

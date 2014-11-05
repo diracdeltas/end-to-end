@@ -22,7 +22,6 @@
 goog.provide('e2e.ext.mime.MimeNode');
 
 goog.require('e2e.ext.constants.Mime');
-goog.require('e2e.ext.constants.mime');
 goog.require('goog.array');
 goog.require('goog.crypt.base64');
 goog.require('goog.object');
@@ -51,13 +50,10 @@ ext.mime.MimeNode = function(options, opt_parent, opt_filename) {
   this.filename = opt_filename;
 
   this.multipart_ = options.multipart;
+  this.children_ = [];
   this.headers_ = {};
   this.content_ = null;
-
-  // TODO: Strictly ensure that the boundary value doesn't coincide with
-  //   any string in the email content and headers.
-  this.boundary_ = goog.string.getRandomString() +
-      Math.floor(Date.now() / 1000).toString();
+  this.boundary_ = '';
 
   this.setHeader_(constants.Mime.CONTENT_TYPE, options.contentType);
 
@@ -65,7 +61,21 @@ ext.mime.MimeNode = function(options, opt_parent, opt_filename) {
     this.setHeader_(constants.Mime.CONTENT_TRANSFER_ENCODING,
                     options.contentTransferEncoding);
   }
+
+  this.setBoundary_();
 };
+
+
+/**
+ * Sets the MIME message boundary for a node.
+ * @private
+ */
+ext.mime.MimeNode.prototype.setBoundary_ = function() {
+  // TODO: Strictly ensure that the boundary value doesn't coincide with
+  //   any string in the email content and headers.
+  this.boundary_ = '---' + goog.string.getRandomString() +
+      Math.floor(Date.now() / 1000).toString();
+}
 
 
 /**
@@ -110,12 +120,8 @@ ext.mime.MimeNode.prototype.addHeaderParams_ = function(headerName, params,
 
   var paramsArray = [];
   goog.object.forEach(params, function(paramValue, paramName) {
-    if (paramName === 'filename') {
-      // TODO: Replace with RFC 2231 compliant encoding.
-      paramValue = /[\s";=]/.test(paramValue) ? goog.string.quote(paramValue) :
-          paramValue;
-    }
-    paramsArray.push(paramName + '=' + paramValue);
+    // TODO: Replace with RFC 2231 compliant encoding.
+    paramsArray.push(paramName + '=' + goog.string.quote(paramValue));
   });
 
   if (paramsArray.length !== 0) {
@@ -137,7 +143,7 @@ ext.mime.MimeNode.prototype.setContent = function(content) {
 
 
 /**
- * Builds an RFC 2822 message from the node.
+ * Builds an RFC 2822 message from the node and its children.
  * @return {string}
  */
 ext.mime.MimeNode.prototype.buildMessage = function() {
@@ -153,14 +159,14 @@ ext.mime.MimeNode.prototype.buildMessage = function() {
     this.addHeaderParams_(constants.Mime.CONTENT_DISPOSITION,
                           {filename: this.filename},
                           constants.Mime.ATTACHMENT);
-  } else if (this.content_ && goog.typeof(this.content_) === 'string') {
+  } else if (this.content_ && goog.typeOf(this.content_) === 'string') {
     // TODO: Support other charsets.
     contentParams['charset'] = 'utf-8';
   } else if (this.multipart_) {
     // Multipart messages need to specify a boundary
     contentParams['boundary'] = this.boundary_;
   }
-  this.addHeaderParams_(constants.mime.CONTENT_TYPE, contentParams,
+  this.addHeaderParams_(constants.Mime.CONTENT_TYPE, contentParams,
                         contentType);
 
   goog.object.forEach(this.headers_, function(headerValue, headerName) {
@@ -172,21 +178,23 @@ ext.mime.MimeNode.prototype.buildMessage = function() {
 
   if (this.content_) {
     if (transferEncoding === constants.Mime.BASE64 ||
-        goog.typeof(this.content_) !== 'string') {
-      lines.push(goog.typeof(this.content_) === 'string' ?
+        goog.typeOf(this.content_) !== 'string') {
+      lines.push(goog.typeOf(this.content_) === 'string' ?
                  goog.crypt.base64.encodeString(this.content_) :
                  goog.crypt.base64.encodeByteArray(this.content_));
     } else {
       lines.push(this.content_);
     }
+    if (this.multipart_) {
+      lines.push('');
+    }
   }
 
   if (this.multipart_) {
-    lines.push('');
-    goog.array.forEach(this.children_, function(node) {
+    goog.array.forEach(this.children_, goog.bind(function(node) {
       lines.push('--' + this.boundary_);
       lines.push(node.buildMessage());
-    });
+    }, this));
     lines.push('--' + this.boundary_ + '--');
     lines.push('');
   }
