@@ -60,7 +60,7 @@ ext.mime.PgpMail = function(content, actionExecutor, currentUser,
  * Processes email into an encrypted MIME tree.
  * @param {!function(string)} callback
  */
-ext.mime.PgpMail.buildSignedEncrypted = function(callback) {
+ext.mime.PgpMail.prototype.buildSignedAndEncrypted = function(callback) {
   var mimetree = this.buildMimeTree_(this.originalContent);
   var request = /** @type {!messages.ApiRequest} */ ({
     action: constants.Actions.ENCRYPT_SIGN,
@@ -83,7 +83,7 @@ ext.mime.PgpMail.buildSignedEncrypted = function(callback) {
  * @return {string}
  * @private
  */
-ext.mime.PgpMail.buildMimeTree_ = function(content) {
+ext.mime.PgpMail.prototype.buildMimeTree_ = function(content) {
   var rootNode;
 
   if (!content.attachments || content.attachments.length === 0) {
@@ -124,7 +124,7 @@ ext.mime.PgpMail.buildMimeTree_ = function(content) {
  * @return {string}
  * @private
  */
-ext.mime.PgpMail.buildEncryptedMimeTree_ = function(encrypted) {
+ext.mime.PgpMail.prototype.buildEncryptedMimeTree_ = function(encrypted) {
   // Build the top-level node
   var rootNode = new mime.MimeNode({multipart: true,
     contentType:
@@ -135,7 +135,7 @@ ext.mime.PgpMail.buildEncryptedMimeTree_ = function(encrypted) {
   // Set the required version info.
   var versionNode = rootNode.addChild({multipart: false,
     contentType:
-        constants.Mime.PGP_ENCRYPTED,
+        constants.Mime.ENCRYPTED,
     contentTransferEncoding:
         constants.Mime.SEVEN_BIT});
   versionNode.setContent(constants.Mime.VERSION_CONTENT);

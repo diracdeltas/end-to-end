@@ -19,24 +19,18 @@
  */
 
 /** @suppress {extraProvide} */
-goog.provide('e2e.ext.api.MimeNodeTest');
+goog.provide('e2e.ext.mime.MimeNodeTest');
 
 goog.require('e2e.ext.constants.Mime');
 goog.require('e2e.ext.mime.MimeNode');
 goog.require('e2e.ext.testingstubs');
-goog.require('goog.testing.MockControl');
 goog.require('goog.testing.PropertyReplacer');
 goog.require('goog.testing.asserts');
 goog.require('goog.testing.jsunit');
-goog.require('goog.testing.mockmatchers');
-goog.require('goog.testing.mockmatchers.ArgumentMatcher');
-goog.require('goog.testing.mockmatchers.SaveArgument');
 goog.setTestOnly();
 
 var constants = e2e.ext.constants;
 var mime = e2e.ext.mime;
-var mockControl = null;
-var mockmatchers = goog.testing.mockmatchers;
 var node = null;
 var filename = 'example.txt';
 var stubs = new goog.testing.PropertyReplacer();
@@ -57,7 +51,6 @@ var FINAL_MESSAGE = ['Content-Type: multipart/mixed; boundary="--foo"',
 
 function setUp() {
   var boundary = '--foo';
-  mockControl = new goog.testing.MockControl();
   e2e.ext.testingstubs.initStubs(stubs);
   stubs.replace(e2e.ext.mime.MimeNode.prototype, 'setBoundary_', function() {
     this.boundary_ = boundary;
@@ -71,7 +64,6 @@ function setUp() {
 
 function tearDown() {
   stubs.reset();
-  mockControl.$tearDown();
   node = null;
 }
 
