@@ -100,8 +100,7 @@ ext.mime.PgpMail.prototype.buildMimeTree_ = function(content) {
 
     var textNode = rootNode.addChild({multipart: false,
       contentType: constants.Mime.PLAINTEXT,
-      contentTransferEncoding:
-                                        constants.Mime.SEVEN_BIT});
+      contentTransferEncoding: constants.Mime.SEVEN_BIT});
     textNode.setContent(content.body);
 
     goog.array.forEach(content.attachments, function(attachment) {
