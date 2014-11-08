@@ -32,6 +32,6 @@ e2e.ext.mime.types.MailContent;
 
 /**
  * @typedef {{filename: string,
- *     content: !e2e.ByteArray}}
+ *     content: !Uint8Array}}
  */
 e2e.ext.mime.types.Attachment;

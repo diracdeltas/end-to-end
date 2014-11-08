@@ -75,7 +75,7 @@ ext.mime.MimeNode.prototype.setBoundary_ = function() {
   //   any string in the email content and headers.
   this.boundary_ = '---' + goog.string.getRandomString() +
       Math.floor(Date.now() / 1000).toString();
-}
+};
 
 
 /**
@@ -116,7 +116,7 @@ ext.mime.MimeNode.prototype.setHeader_ = function(key, value) {
  */
 ext.mime.MimeNode.prototype.addHeaderParams_ = function(headerName, params,
                                                         value) {
-  var value = goog.object.get(this.headers_, headerName, value);
+  value = goog.object.get(this.headers_, headerName, value);
 
   var paramsArray = [];
   goog.object.forEach(params, function(paramValue, paramName) {
@@ -161,16 +161,16 @@ ext.mime.MimeNode.prototype.buildMessage = function() {
                           constants.Mime.ATTACHMENT);
   } else if (this.content_ && goog.typeOf(this.content_) === 'string') {
     // TODO: Support other charsets.
-    contentParams['charset'] = 'utf-8';
+    contentParams.charset = constants.Mime.UTF8;
   } else if (this.multipart_) {
     // Multipart messages need to specify a boundary
-    contentParams['boundary'] = this.boundary_;
+    contentParams.boundary = this.boundary_;
   }
   this.addHeaderParams_(constants.Mime.CONTENT_TYPE, contentParams,
                         contentType);
 
   goog.object.forEach(this.headers_, function(headerValue, headerName) {
-    // TODO: Wrap lines
+    // TODO: Wrap lines at 76 chars
     lines.push([headerName, headerValue].join(': '));
   });
 
@@ -179,10 +179,12 @@ ext.mime.MimeNode.prototype.buildMessage = function() {
   if (this.content_) {
     if (transferEncoding === constants.Mime.BASE64 ||
         goog.typeOf(this.content_) !== 'string') {
+      // TODO: Wrap lines at 76 chars
       lines.push(goog.typeOf(this.content_) === 'string' ?
                  goog.crypt.base64.encodeString(this.content_) :
                  goog.crypt.base64.encodeByteArray(this.content_));
     } else {
+      // TODO: Technically lines must be wrapped at 1000 chars max for SMTP.
       lines.push(this.content_);
     }
     if (this.multipart_) {
@@ -199,7 +201,7 @@ ext.mime.MimeNode.prototype.buildMessage = function() {
     lines.push('');
   }
 
-  return lines.join('\r\n');
+  return lines.join(constants.Mime.CRLF);
 };
 
 });  // goog.scope

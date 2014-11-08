@@ -232,16 +232,19 @@ e2e.ext.constants.BACKUP_CODE_LENGTH = 24;
  * @enum {string}
  */
 e2e.ext.constants.Mime = {
+  // Separators
+  CRLF: '\r\n',
+
   // Header names
   CONTENT_TYPE: 'Content-Type',
   CONTENT_TRANSFER_ENCODING: 'Content-Transfer-Encoding',
   MIME_VERSION: 'Mime-Version',
   CONTENT_DISPOSITION: 'Content-Disposition',
 
-  // Content fields
+  // OpenPGP version content field. Required by RFC 3156.
   VERSION_CONTENT: 'Version: 1',
 
-  // Content Types
+  // Content Types. Case-insensitive.
   PLAINTEXT: 'text/plain',
   MULTIPART_ENCRYPTED:
       'multipart/encrypted; protocol=application/pgp-encrypted',
@@ -255,5 +258,9 @@ e2e.ext.constants.Mime = {
   BASE64: 'base64',
 
   // Content dispositions
-  ATTACHMENT: 'attachment'
+  ATTACHMENT: 'attachment',
+
+  // Charset. Case-insensitive.
+  UTF8: 'utf-8',
+  ASCII: 'us-ascii'
 };
