@@ -26,7 +26,6 @@ goog.require('e2e.ext.mime.MimeNode');
 goog.require('e2e.ext.constants.Mime');
 goog.require('goog.array');
 goog.require('goog.crypt.base64');
-goog.require('goog.object');
 goog.require('goog.string');
 
 goog.scope(function() {
@@ -48,10 +47,11 @@ ext.mime.utils.getEncryptedMimeTree = function(text) {
   var line = lines.shift();
 
   // Parse the Content-Type header. Ignore other headers for now.
-  var contentTypeLine = utils.parseHeaderLine(line);
-  if (!utils.validateContentTypeHeader_(contentTypeLine) ||
-      contentTypeLine.value !== constants.Mime.MULTIPART_ENCRYPTED ||
-      contentTypeLine.params.protocol !== constants.Mime.ENCRYPTED) {
+  var ctHeader = utils.parseHeaderLine(line);
+  if (!utils.validateContentTypeHeader_(ctHeader) ||
+      !ctHeader.params.boundary ||
+      ctHeader.value !== constants.Mime.MULTIPART_ENCRYPTED ||
+      ctHeader.params.protocol !== constants.Mime.ENCRYPTED) {
     // This does not appear to be a valid PGP encrypted MIME message.
     utils.fail_();
   } else {
@@ -68,9 +68,9 @@ ext.mime.utils.getEncryptedMimeTree = function(text) {
       line = lines.shift();
     } while (line !== boundary);
     // Next node is the required 'application/pgp-encrypted' version node.
-    contentTypeLine = utils.parseHeaderLine(lines.shift());
-    if (!utils.validateContentTypeHeader_(contentTypeLine) ||
-        contentTypeLine.value !== constants.Mime.ENCRYPTED) {
+    ctHeader = utils.parseHeaderLine(lines.shift());
+    if (!utils.validateContentTypeHeader_(ctHeader) ||
+        ctHeader.value !== constants.Mime.ENCRYPTED) {
       utils.fail_();
     } else {
       // Ignore the rest of the node
@@ -78,9 +78,9 @@ ext.mime.utils.getEncryptedMimeTree = function(text) {
         line = lines.shift();
       } while (line !== boundary);
       // Next node is the actual encrypted content.
-      contentTypeLine = utils.parseHeaderLine(lines.shift());
-      if (!utils.validateContentTypeHeader_(contentTypeLine) ||
-          contentTypeLine.value !== constants.Mime.OCTET_STREAM) {
+      ctHeader = utils.parseHeaderLine(lines.shift());
+      if (!utils.validateContentTypeHeader_(ctHeader) ||
+          ctHeader.value !== constants.Mime.OCTET_STREAM) {
         utils.fail_();
       } else {
         // Ignore the rest of the headers
@@ -92,19 +92,6 @@ ext.mime.utils.getEncryptedMimeTree = function(text) {
     }
   }
 };
-});  // goog.scope
-
-
-/**
- * Validates a parsed Content-Type header.
- * @param {Object} header The header to validate
- * @return {boolean}
- * @private
- */
-ext.mime.utils.validateContentTypeHeader_ = function(header) {
-  return (header && header.params && header.params.boundary &&
-          header.name === constants.Mime.CONTENT_TYPE);
-};
 
 
 /**
@@ -113,13 +100,134 @@ ext.mime.utils.validateContentTypeHeader_ = function(header) {
  * @return {Array.<!e2e.ext.mime.types.MailContent>}
  */
 ext.mime.utils.getMailContent = function(text) {
-  var content = [];
+  var content = {};
+  var boundary;
+  var endLocation;
   var lines = text.split(constants.Mime.CRLF);
 
+  var line = lines.shift();
+  var ctHeader = utils.parseHeaderLine(line);
+  if (!utils.validateContentTypeHeader_(ctHeader)) {
+    utils.fail_();
+    return;
+  }
+
   // Case 1: Single plaintext node.
+  if (ctHeader.value === constants.Mime.PLAINTEXT) {
+    content.body = utils.getContentFromTextNode_(lines);
+    return content;
+  }
 
-  // Case 2: Plaintext node with attachment nodes
+  // Case 2: Multipart node
+  if (ctHeader.value === constants.Mime.MULTIPART_MIXED &&
+      ctHeader.params.boundary) {
+    boundary = '--' + ctHeader.params.boundary;
+    content.attachments = [];
 
+    // Ignore all lines after the end boundary
+    endLocation = goog.array.indexOf(lines, boundary + '--');
+    if (endLocation === -1) {
+      utils.fail_();
+      return;
+    }
+    lines = goog.array.slice(lines, 0, endLocation);
+
+    // Split text into node chunks
+    var nodes = lines.join(constants.Mime.CRLF).split(boundary);
+
+    goog.array.forEach(nodes, function(node) {
+      var lines = node.split(constants.Mime.CRLF);
+      if (utils.isTextNode_(lines)) {
+        content.body = utils.getContentFromTextNode_(lines);
+      } else if (utils.isAttachmentNode_(lines)) {
+        try {
+          content.attachments.push(utils.getContentFromAttachmentNode_(lines));
+        } catch(e) {
+          utils.fail_();
+        }
+      }
+    });
+
+    return content;
+  }
+
+  // If neither Case 1 or 2, MIME tree is unsupported.
+  utils.fail_();
+};
+
+
+/**
+ * Determines if a node is a text node.
+ * @param {Array} lines
+ * @return {boolean}
+ * @private
+ */
+ext.mime.utils.isTextNode_ = function(lines) {
+  var ctHeader = utils.parseHeaderLine(lines[0]);
+  return utils.validateContentTypeHeader_(ctHeader) &&
+    ctHeader.value === constants.Mime.PLAINTEXT;
+};
+
+
+/**
+ * Determins if a node is an attachment node.
+ * @param {Array} lines
+ * @return {boolean}
+ * @private
+ */
+ext.mime.utils.isAttachmentNode_ = function(lines) {
+  var ctHeader = utils.parseHeaderLine(lines[0]);
+  return utils.validateContentHeader_(ctHeader) &&
+    ctHeader.value === constants.Mime.OCTET_STREAM;
+};
+
+
+/**
+ * Extracts text content from a plaintext node.
+ * @param {Array} lines
+ * @return {string}
+ * @private
+ */
+ext.mime.utils.getContentFromTextNode_ = function(lines) {
+  do {
+    line = lines.shift();
+  } while (line !== '');
+  return lines.join('');
+};
+
+
+/**
+ * Extract attachment content from an attachment node.
+ * @param {Array} lines
+ * @return {e2e.ext.mime.types.Attachment}
+ * @private
+ */
+ext.mime.utils.getContentFromAttachmentNode_ = function(lines) {
+  var headers = [];
+  var body;
+  var line = lines.shift();
+  while (line !== '') {
+    headers.push(utils.parseHeaderLine(line));
+    line = lines.shift();
+  }
+
+  var filename;
+  var base64 = false;
+
+  goog.array.forEach(headers, function(header) {
+    if (header.name === constants.Mime.CONTENT_TRANSFER_ENCODING) {
+      base64 = (header.value === constants.Mime.BASE64);
+    } else if (header.name === constants.Mime.CONTENT_DISPOSITION) {
+      filename = content.params.filename;
+    }
+  });
+
+  if (!goog.isString(filename) || !base64) {
+    utils.fail_();
+  }
+  body = goog.crypt.base64.decodeStringToByteArray(lines.join(''));
+
+  return {filename: filename, content: body};
 };
 
 
@@ -156,9 +264,23 @@ ext.mime.utils.parseHeaderLine = function(line) {
 
 
 /**
+ * Validates a parsed Content-Type header.
+ * @param {Object} header The header to validate
+ * @return {boolean}
+ * @private
+ */
+ext.mime.utils.validateContentTypeHeader_ = function(header) {
+  return (header && header.params &&
+          header.name === constants.Mime.CONTENT_TYPE);
+};
+
+
+/**
  * Handle failure to parse MIME content.
  * @private
  */
 ext.mime.utils.fail_ = function() {
   throw new e2e.error.UnsupportedError('Unsupported MIME content');
 };
+
+});  // goog.scope

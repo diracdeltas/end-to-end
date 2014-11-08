@@ -87,7 +87,7 @@ ext.mime.PgpMail.prototype.buildMimeTree_ = function(content) {
   var rootNode;
 
   if (!content.attachments || content.attachments.length === 0) {
-    // Create a single plaintext node. TODO: Support 7-bit transfer encoding.
+    // Create a single plaintext node.
     rootNode = new mime.MimeNode({multipart: false,
       contentType: constants.Mime.PLAINTEXT,
       contentTransferEncoding:
