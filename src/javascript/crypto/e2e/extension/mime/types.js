@@ -24,7 +24,7 @@ goog.provide('e2e.ext.mime.types.MailContent');
 
 
 /**
- * @typedef {{body: string,
+ * @typedef {{body: (string|undefined),
  *     attachments: (Array.<!e2e.ext.mime.Attachment>|undefined)}}
  */
 e2e.ext.mime.types.MailContent;

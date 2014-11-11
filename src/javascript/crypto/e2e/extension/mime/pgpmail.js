@@ -15,7 +15,7 @@
  */
 
 /**
- * @fileoverview PGP/MIME email builder (RFC 2822, RFC 3156).
+ * @fileoverview PGP/MIME message entity builder (RFC 2045, RFC 2822, RFC 3156).
  * @author yzhu@yahoo-inc.com (Yan Zhu)
  */
 
