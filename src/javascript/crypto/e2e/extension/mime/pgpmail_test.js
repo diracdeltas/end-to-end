@@ -21,8 +21,8 @@
 /** @suppress {extraProvide} */
 goog.provide('e2e.ext.mime.PgpMailTest');
 
-goog.require('e2e.ext');
 goog.require('e2e.ext.actions.Executor');
+goog.require('e2e.ext.constants');
 goog.require('e2e.ext.mime.MimeNode');
 goog.require('e2e.ext.mime.PgpMail');
 goog.require('e2e.ext.testingstubs');

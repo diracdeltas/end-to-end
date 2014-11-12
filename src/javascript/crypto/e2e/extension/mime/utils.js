@@ -38,31 +38,31 @@ var utils = e2e.ext.mime.utils;
  * @return {string}
  */
 ext.mime.utils.getEncryptedMimeTree = function(text) {
-  var rootNode = utils.parseNode(text);
+  var rootNode = utils.parseNode_(text);
   var ctHeader = rootNode.header[constants.Mime.CONTENT_TYPE];
 
   if (ctHeader.value !== constants.Mime.MULTIPART_ENCRYPTED ||
       !ctHeader.params ||
       ctHeader.params.protocol !== constants.Mime.ENCRYPTED ||
-      !goog.isArray(rootNode.content)) {
+      !goog.isArray(rootNode.body)) {
     // This does not appear to be a valid PGP encrypted MIME message.
     utils.fail_();
   } else {
     // Next node is the required 'application/pgp-encrypted' version node.
-    var middleNode = rootNode.content[0];
+    var middleNode = rootNode.body[0];
     ctHeader = middleNode.header[constants.Mime.CONTENT_TYPE];
     if (ctHeader.value !== constants.Mime.ENCRYPTED ||
-        !goog.isArray(middleNode.content)) {
+        !goog.isArray(middleNode.body)) {
       utils.fail_();
     } else {
       // Next node is the actual encrypted content.
-      var leafNode = middleNode.content[0];
+      var leafNode = middleNode.body[0];
       ctHeader = leafNode.header[constants.Mime.CONTENT_TYPE];
       if (ctHeader.value !== constants.Mime.OCTET_STREAM ||
-          !goog.isString(leafNode.content)) {
+          !goog.isString(leafNode.body)) {
         utils.fail_();
       } else {
-        return leafNode.content;
+        return leafNode.body;
       }
     }
   }
@@ -76,28 +76,31 @@ ext.mime.utils.getEncryptedMimeTree = function(text) {
  */
 ext.mime.utils.getMailContent = function(text) {
   var mailContent = {};
-  var rootNode = utils.parseNode(text);
+  var rootNode = utils.parseNode_(text);
   var ctHeader = rootNode.header[constants.Mime.CONTENT_TYPE];
 
   // Case 1: Single plaintext node.
   if (ctHeader.value === constants.Mime.PLAINTEXT &&
-      goog.isString(rootNode.content)) {
-    mailContent.body = rootNode.content;
+      goog.isString(rootNode.body)) {
+    mailContent.body = rootNode.body;
     return mailContent;
   }
 
   // Case 2: Multipart node
   if (ctHeader.value === constants.Mime.MULTIPART_MIXED &&
-      goog.isArray(rootNode.content)) {
+      goog.isArray(rootNode.body)) {
     mailContent.attachments = [];
 
-    goog.array.forEach(rootNode.content, goog.bind(function(node) {
+    goog.array.forEach(rootNode.body, goog.bind(function(node) {
       var ct = node.header[constants.Mime.CONTENT_TYPE].value;
-      if (!goog.isString(node.content) || !ct) {
+      if (!goog.isString(node.body) || !ct) {
         return;
       }
       if (ct === constants.Mime.PLAINTEXT) {
-        mailContent.body = utils.getContentFromTextNode_(node);
+        var text = utils.getContentFromTextNode_(node);
+        mailContent.body = mailContent.body ?
+            utils.joinLines_([mailContent.body, text]) :
+            text;
       } else if (ct === constants.Mime.OCTET_STREAM) {
         try {
           mailContent.attachments.push(
@@ -117,7 +120,7 @@ ext.mime.utils.getMailContent = function(text) {
 
 /**
  * Extract attachment content from an attachment node.
- * @param {e2e.ext.mime.types.Node} node
+ * @param {e2e.ext.mime.types.Entity} node
  * @return {e2e.ext.mime.types.Attachment}
  * @private
  */
@@ -133,12 +136,12 @@ ext.mime.utils.getContentFromAttachmentNode_ = function(node) {
     utils.fail_();
   }
 
-  if (!base64 || !filename || !goog.isString(node.content)) {
+  if (!base64 || !filename || !goog.isString(node.body)) {
     utils.fail_();
   }
 
   return {filename: filename,
-    content: goog.crypt.base64.decodeStringToByteArray(node.content)};
+    content: goog.crypt.base64.decodeStringToByteArray(node.body)};
 };
 
 
@@ -241,12 +244,13 @@ ext.mime.utils.splitNodes_ = function(text, boundary) {
 
 
 /**
- * Parses a MIME node into a header and content. For multipart messages,
- *   the content is an array of child nodes. Otherwise content is a string.
+ * Parses a MIME node into a header and body. For multipart messages,
+ *   the body is an array of child nodes. Otherwise body is a string.
  * @param {string} text The text to parse.
- * @return {e2e.ext.mime.types.Node}
+ * @return {!e2e.ext.mime.types.Entity}
+ * @private
  */
-ext.mime.utils.parseNode = function(text) {
+ext.mime.utils.parseNode_ = function(text) {
   // Header must be separated from body by an empty line
   var parts = text.split(constants.Mime.CRLF + constants.Mime.CRLF);
   if (parts.length < 2) {
@@ -256,16 +260,18 @@ ext.mime.utils.parseNode = function(text) {
   var header = utils.parseHeader_(parts.shift());
   var body = utils.joinLines_(parts);
   var ctHeader = header[constants.Mime.CONTENT_TYPE];
+  var parsed = {};
+  parsed.header = header;
 
   if (ctHeader.params && ctHeader.params.boundary) {
     // This appears to be a multipart message. Split text by boundary.
     var nodes = utils.splitNodes_(body, ctHeader.params.boundary);
     // Recursively parse nodes
-    return {header: header, content: goog.array.map(nodes,
-                                                    utils.parseNode)};
+    parsed.body = goog.array.map(nodes, utils.parseNode_);
   } else {
-    return {header: header, content: body};
+    parsed.body = body;
   }
+  return parsed;
 };
 
 });  // goog.scope

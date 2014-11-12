@@ -21,7 +21,7 @@
 /** @suppress {extraProvide} */
 goog.provide('e2e.ext.mime.MimeNodeTest');
 
-goog.require('e2e.ext');
+goog.require('e2e.ext.constants');
 goog.require('e2e.ext.mime.MimeNode');
 goog.require('e2e.ext.testingstubs');
 goog.require('goog.testing.PropertyReplacer');

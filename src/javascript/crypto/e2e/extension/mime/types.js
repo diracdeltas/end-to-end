@@ -20,9 +20,9 @@
  */
 
 goog.provide('e2e.ext.mime.types.Attachment');
+goog.provide('e2e.ext.mime.types.Entity');
 goog.provide('e2e.ext.mime.types.Header');
 goog.provide('e2e.ext.mime.types.MailContent');
-goog.provide('e2e.ext.mime.types.Node');
 
 
 /**
@@ -41,13 +41,13 @@ e2e.ext.mime.types.Attachment;
 
 /**
  * @typedef {Object.<string, {value: string,
- *     params: (Object.<string, string>|undefined)}>}
+ *     params: (!Object.<string, string>|undefined)}>}
  */
 e2e.ext.mime.types.Header;
 
 
 /**
  * @typedef {{header: !e2e.ext.mime.types.Header,
- *     content: (string|Array.<e2e.ext.mime.types.Node>)}}
+ *     body: (string|!Array.<e2e.ext.mime.types.Entity>)}}
  */
-e2e.ext.mime.types.Node;
+e2e.ext.mime.types.Entity;
