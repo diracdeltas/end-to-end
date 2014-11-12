@@ -251,6 +251,7 @@ e2e.ext.constants.Mime = {
   ENCRYPTED: 'application/pgp-encrypted',
   OCTET_STREAM: 'application/octet-stream',
   MULTIPART_MIXED: 'multipart/mixed',
+  DEFAULT_CONTENT_TYPE: 'text/plain; charset=us-ascii',
 
   // Content Transfer Encodings
   SEVEN_BIT: '7bit',

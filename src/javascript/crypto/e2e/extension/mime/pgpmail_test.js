@@ -21,8 +21,9 @@
 /** @suppress {extraProvide} */
 goog.provide('e2e.ext.mime.PgpMailTest');
 
+goog.require('e2e.ext');
 goog.require('e2e.ext.actions.Executor');
-goog.require('e2e.ext.constants.Mime');
+goog.require('e2e.ext.mime.MimeNode');
 goog.require('e2e.ext.mime.PgpMail');
 goog.require('e2e.ext.testingstubs');
 goog.require('goog.testing.MockControl');
@@ -30,8 +31,6 @@ goog.require('goog.testing.PropertyReplacer');
 goog.require('goog.testing.asserts');
 goog.require('goog.testing.jsunit');
 goog.require('goog.testing.mockmatchers');
-goog.require('goog.testing.mockmatchers.ArgumentMatcher');
-goog.require('goog.testing.mockmatchers.SaveArgument');
 goog.setTestOnly();
 
 var constants = e2e.ext.constants;
@@ -48,7 +47,6 @@ var BOUNDARY = '--foo';
 
 
 function setUp() {
-  var boundary = '--foo';
   mockControl = new goog.testing.MockControl();
   e2e.ext.testingstubs.initStubs(stubs);
   stubs.replace(e2e.ext.mime.MimeNode.prototype, 'setBoundary_', function() {
@@ -103,7 +101,7 @@ function testBuildSignedAndEncrypted() {
   });
 
   e2e.ext.actions.Executor.prototype.
-    execute(requestArg, mockmatchers.ignoreArgument, cb);
+      execute(requestArg, mockmatchers.ignoreArgument, cb);
 
   mockControl.$replayAll();
 
@@ -112,7 +110,7 @@ function testBuildSignedAndEncrypted() {
     arr[i] = BINARY_CONTENT.charCodeAt(i);
   }
   var content = {body: TEXT_CONTENT,
-      attachments: [{filename: filename, content: arr}]};
+    attachments: [{filename: filename, content: arr}]};
 
   var mail = new e2e.ext.mime.PgpMail(content, actionExecutor, signer,
                                       signMessage);

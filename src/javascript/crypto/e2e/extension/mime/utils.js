@@ -22,11 +22,9 @@
 goog.provide('e2e.ext.mime.utils');
 
 goog.require('e2e.error.UnsupportedError');
-goog.require('e2e.ext.mime.MimeNode');
 goog.require('e2e.ext.constants.Mime');
 goog.require('goog.array');
 goog.require('goog.crypt.base64');
-goog.require('goog.string');
 
 goog.scope(function() {
 var ext = e2e.ext;
@@ -40,49 +38,31 @@ var utils = e2e.ext.mime.utils;
  * @return {string}
  */
 ext.mime.utils.getEncryptedMimeTree = function(text) {
-  var boundary;
-  var line;
+  var rootNode = utils.parseNode(text);
+  var ctHeader = rootNode.header[constants.Mime.CONTENT_TYPE];
 
-  var ctHeader = utils.parseHeader(text)[constants.Mime.CONTENT_TYPE];
-  var lines = utils.splitLines_(text);
-
-  // Parse the Content-Type header. Ignore other headers for now.
-  if (!ctHeader || !ctHeader.params ||
-      !ctHeader.params.boundary ||
-      ctHeader.value !== constants.Mime.MULTIPART_ENCRYPTED ||
-      ctHeader.params.protocol !== constants.Mime.ENCRYPTED) {
+  if (ctHeader.value !== constants.Mime.MULTIPART_ENCRYPTED ||
+      !ctHeader.params ||
+      ctHeader.params.protocol !== constants.Mime.ENCRYPTED ||
+      !goog.isArray(rootNode.content)) {
     // This does not appear to be a valid PGP encrypted MIME message.
     utils.fail_();
   } else {
-    boundary = '--' + ctHeader.params.boundary;
-    // Ignore all lines after the end boundary
-    lines = utils.stripEndLines_(lines, ctHeader.params.boundary);
-    // Ignore the rest of the headers
-    do {
-      line = lines.shift();
-    } while (line !== boundary);
     // Next node is the required 'application/pgp-encrypted' version node.
-    ctHeader = utils.parseHeader(utils.joinLines_(lines))[
-      constants.Mime.CONTENT_TYPE];
-    if (!ctHeader || ctHeader.value !== constants.Mime.ENCRYPTED) {
+    var middleNode = rootNode.content[0];
+    ctHeader = middleNode.header[constants.Mime.CONTENT_TYPE];
+    if (ctHeader.value !== constants.Mime.ENCRYPTED ||
+        !goog.isArray(middleNode.content)) {
       utils.fail_();
     } else {
-      // Ignore the rest of the node
-      do {
-        line = lines.shift();
-      } while (line !== boundary);
       // Next node is the actual encrypted content.
-      ctHeader = utils.parseHeader(utils.joinLines_(lines))[
-        constants.Mime.CONTENT_TYPE];
-      if (!ctHeader || ctHeader.value !== constants.Mime.OCTET_STREAM) {
+      var leafNode = middleNode.content[0];
+      ctHeader = leafNode.header[constants.Mime.CONTENT_TYPE];
+      if (ctHeader.value !== constants.Mime.OCTET_STREAM ||
+          !goog.isString(leafNode.content)) {
         utils.fail_();
       } else {
-        // Ignore the rest of the headers
-        do {
-          line = lines.shift();
-        } while (line !== '');
-        // Return the encrypted body
-        return utils.joinLines_(lines);
+        return leafNode.content;
       }
     }
   }
@@ -95,47 +75,39 @@ ext.mime.utils.getEncryptedMimeTree = function(text) {
  * @return {e2e.ext.mime.types.MailContent}
  */
 ext.mime.utils.getMailContent = function(text) {
-  var content = {};
-  var line;
-  var lines = utils.splitLines_(text);
-
-  var ctHeader = utils.parseHeader(text)[constants.Mime.CONTENT_TYPE];
-  if (!ctHeader) {
-    utils.fail_();
-  }
+  var mailContent = {};
+  var rootNode = utils.parseNode(text);
+  var ctHeader = rootNode.header[constants.Mime.CONTENT_TYPE];
 
   // Case 1: Single plaintext node.
-  if (ctHeader.value === constants.Mime.PLAINTEXT) {
-    content.body = utils.getContentFromTextNode_(lines);
-    return content;
+  if (ctHeader.value === constants.Mime.PLAINTEXT &&
+      goog.isString(rootNode.content)) {
+    mailContent.body = rootNode.content;
+    return mailContent;
   }
 
   // Case 2: Multipart node
   if (ctHeader.value === constants.Mime.MULTIPART_MIXED &&
-      ctHeader.params &&
-      ctHeader.params.boundary) {
-    content.attachments = [];
+      goog.isArray(rootNode.content)) {
+    mailContent.attachments = [];
 
-    // Ignore all lines after the end boundary
-    lines = utils.stripEndLines_(lines, ctHeader.params.boundary);
-
-    // Split text into node chunks
-    var nodes = utils.joinLines_(lines).split('--' + boundary);
-
-    goog.array.forEach(nodes, goog.bind(function(node) {
-      var nodeLines = utils.splitLines_(node);
-      if (utils.isTextNode_(node)) {
-        content.body = utils.getContentFromTextNode_(nodeLines);
-      } else if (utils.isAttachmentNode_(node)) {
+    goog.array.forEach(rootNode.content, goog.bind(function(node) {
+      var ct = node.header[constants.Mime.CONTENT_TYPE].value;
+      if (!goog.isString(node.content) || !ct) {
+        return;
+      }
+      if (ct === constants.Mime.PLAINTEXT) {
+        mailContent.body = utils.getContentFromTextNode_(node);
+      } else if (ct === constants.Mime.OCTET_STREAM) {
         try {
-          content.attachments.push(
-            utils.getContentFromAttachmentNode_(nodeLines));
-        } catch(e) {
+          mailContent.attachments.push(
+              utils.getContentFromAttachmentNode_(node));
+        } catch (e) {
         }
       }
     }, this));
 
-    return content;
+    return mailContent;
   }
 
   // If neither Case 1 or 2, MIME tree is unsupported.
@@ -144,143 +116,67 @@ ext.mime.utils.getMailContent = function(text) {
 
 
 /**
- * Strips lines after the MIME boundary.
- * @param {Array.<string>} lines The lines of the MIME message.
- * @param {string} boundary The boundary parameter, as specified in the MIME
- *   header
- * @return {Array.<string>}
- * @private
- */
-ext.mime.utils.stripEndLines_ = function(lines, boundary) {
-  var endLocation = goog.array.indexOf(lines, '--' + boundary + '--');
-  if (endLocation === -1) {
-    utils.fail_();
-  }
-  return goog.array.slice(lines, 0, endLocation);
-};
-
-
-/**
- * Determines if a node is a text node.
- * @param {string} text
- * @return {boolean}
- * @private
- */
-ext.mime.utils.isTextNode_ = function(text) {
-  var ctHeader = utils.parseHeader(text)[constants.Mime.CONTENT_TYPE];
-  return ctHeader && ctHeader.value === constants.Mime.PLAINTEXT;
-};
-
-
-/**
- * Determins if a node is an attachment node.
- * @param {string} text
- * @return {boolean}
- * @private
- */
-ext.mime.utils.isAttachmentNode_ = function(text) {
-  var ctHeader = utils.parseHeader(text)[constants.Mime.CONTENT_TYPE];
-  return ctHeader && ctHeader.value === constants.Mime.OCTET_STREAM;
-};
-
-
-/**
- * Extracts text content from a plaintext node.
- * @param {Array.<string>} lines
- * @return {string}
- * @private
- */
-ext.mime.utils.getContentFromTextNode_ = function(lines) {
-  do {
-    line = lines.shift();
-  } while (line !== '');
-  return lines.join('');
-};
-
-
-/**
  * Extract attachment content from an attachment node.
- * @param {Array.<string>} lines
+ * @param {e2e.ext.mime.types.Node} node
  * @return {e2e.ext.mime.types.Attachment}
  * @private
  */
-ext.mime.utils.getContentFromAttachmentNode_ = function(lines) {
-  var body;
+ext.mime.utils.getContentFromAttachmentNode_ = function(node) {
   var filename;
   var base64 = false;
-  var text = utils.joinLines_(lines);
 
-  var headers = utils.parseHeader(text);
   try {
-    base64 = (headers[constants.Mime.CONTENT_TRANSFER_ENCODING].value ===
+    base64 = (node.header[constants.Mime.CONTENT_TRANSFER_ENCODING].value ===
               constants.Mime.BASE64);
-    filename = headers[constants.Mime.CONTENT_DISPOSITION].params.filename;
+    filename = node.header[constants.Mime.CONTENT_DISPOSITION].params.filename;
   } catch (e) {
     utils.fail_();
   }
 
-  var content = text.split(constants.Mime.CRLF + constants.Mime.CRLF)[1];
-
-  if (!base64 || !content) {
+  if (!base64 || !filename || !goog.isString(node.content)) {
     utils.fail_();
   }
 
   return {filename: filename,
-          content: goog.crypt.base64.decodeStringToByteArray(content)};
+    content: goog.crypt.base64.decodeStringToByteArray(node.content)};
 };
 
 
 /**
- * Parses a MIME header line into a dict.
- * @param {string} line The header line to parse.
- * @return {{name: string, value: string, params: Object.<string, string>}}
+ * Parses MIME headers into a dict.
+ * @param {string} text The MIME-formatted message.
+ * @return {e2e.ext.mime.types.Header}
  * @private
  */
-ext.mime.utils.parseHeaderLine_ = function(line) {
-  var header = {};
-  var parts = line.split('; ');
+ext.mime.utils.parseHeader_ = function(text) {
+  var parsed = {};
+  parsed[constants.Mime.CONTENT_TYPE] = {
+    value: constants.Mime.CONTENT_TYPE_DEFAULT};
 
-  // Ex: 'Content-Type: multipart/encrypted'
-  var firstPart = parts.shift();
-  var mainHeaderParts = firstPart.split(': ');
-  if (mainHeaderParts.length < 2) {
-    return header;
-  }
+  var headerLines = utils.splitLines_(text);
+  goog.array.forEach(headerLines, goog.bind(function(line) {
+    var parts = line.split('; ');
 
-  header.name = mainHeader.shift();
-  header.value = mainHeader.join('').toLowerCase();
-
-  header.params = {};
-  goog.array.forEach(parts, goog.bind(function(part) {
-    // Ex: 'protocol=application/pgp-encrypted'
-    var paramParts = part.split('=');
-    if (paramParts.length < 2) {
+    // Ex: 'Content-Type: multipart/encrypted'
+    var firstPart = parts.shift().split(':');
+    if (firstPart.length < 2) {
       return;
     }
-    var paramName = paramParts.shift().toLowerCase();
-    header.params[paramName] = paramParts.join('').toLowerCase();
-  }, this));
-};
+    var name = firstPart.shift();
+    var value = firstPart.join('').toLowerCase().strip();
 
+    var params = {};
+    goog.array.forEach(parts, goog.bind(function(part) {
+      // Ex: 'protocol=application/pgp-encrypted'
+      var paramParts = part.split('=');
+      if (paramParts.length < 2) {
+        return;
+      }
+      var paramName = paramParts.shift().toLowerCase();
+      params[paramName] = paramParts.join('').toLowerCase().strip();
+    }, this));
 
-/**
- * Extracts MIME headers from a MIME message.
- * @param {string} text The MIME-formatted message.
- * @return {Object.<string, {value: string, params: Object.<string, string>}>}
- */
-ext.mime.utils.parseHeader = function(text) {
-  // Headers are separated from body by an empty line, according to RFC 2822
-  var header = text.split(constants.Mime.CRLF + constants.Mime.CRLF)[0];
-  var parsed = {};
-  if (!header) {
-    return parsed;
-  }
-  var headerLines = utils.splitLines_(header);
-  goog.array.forEach(headerLines, goog.bind(function(line) {
-    var parsedLine = utils.parseHeaderLine_(line);
-    if (parsedLine && parsedLine.name) {
-      parsed[parsedLine.name] = parsedLine[parsedLine.name];
-    }
+    parsed[name] = {value: value, params: params};
   }, this));
   return parsed;
 };
@@ -314,6 +210,62 @@ ext.mime.utils.splitLines_ = function(text) {
  */
 ext.mime.utils.joinLines_ = function(lines) {
   return lines.join(constants.Mime.CRLF);
+};
+
+
+/**
+ * Splits a MIME message into nodes separated by the MIME boundary ignoring
+ *   all lines after the end boundary.
+ * @param {string} text The message to split.
+ * @param {string} boundary The boundary parameter, as specified in the MIME
+ *   header
+ * @return {Array.<string>}
+ * @private
+ */
+ext.mime.utils.splitNodes_ = function(text, boundary) {
+  var lines = utils.splitLines_(text);
+  var startLocation = goog.array.indexOf(lines, '--' + boundary +
+                                         constants.Mime.CRLF);
+  var endLocation = goog.array.indexOf(lines, '--' + boundary + '--');
+  if (endLocation === -1 || startLocation === -1) {
+    utils.fail_();
+  }
+  // Ignore the epilogue after the end boundary.
+  lines = goog.array.slice(lines, 0, endLocation);
+  // Ignore the preamble before the first boundary occurrence.
+  lines = goog.array.slice(lines, startLocation);
+
+  text = utils.joinLines_(lines);
+  return text.split('--' + boundary + constants.Mime.CRLF);
+};
+
+
+/**
+ * Parses a MIME node into a header and content. For multipart messages,
+ *   the content is an array of child nodes. Otherwise content is a string.
+ * @param {string} text The text to parse.
+ * @return {e2e.ext.mime.types.Node}
+ */
+ext.mime.utils.parseNode = function(text) {
+  // Header must be separated from body by an empty line
+  var parts = text.split(constants.Mime.CRLF + constants.Mime.CRLF);
+  if (parts.length < 2) {
+    utils.fail_();
+  }
+
+  var header = utils.parseHeader_(parts.shift());
+  var body = utils.joinLines_(parts);
+  var ctHeader = header[constants.Mime.CONTENT_TYPE];
+
+  if (ctHeader.params && ctHeader.params.boundary) {
+    // This appears to be a multipart message. Split text by boundary.
+    var nodes = utils.splitNodes_(body, ctHeader.params.boundary);
+    // Recursively parse nodes
+    return {header: header, content: goog.array.map(nodes,
+                                                    utils.parseNode)};
+  } else {
+    return {header: header, content: body};
+  }
 };
 
 });  // goog.scope
