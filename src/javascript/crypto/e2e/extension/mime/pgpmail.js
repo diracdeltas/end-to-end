@@ -127,7 +127,7 @@ ext.mime.PgpMail.prototype.buildEncryptedMimeTree_ = function(encrypted) {
   // Build the top-level node
   var rootNode = new mime.MimeNode({multipart: true,
     contentType:
-        constants.Mime.MULTIPART_ENCRYPTED,
+        constants.Mime.DEFAULT_ENCRYPTED_CONTENT_TYPE,
     contentTransferEncoding:
         constants.Mime.SEVEN_BIT});
 

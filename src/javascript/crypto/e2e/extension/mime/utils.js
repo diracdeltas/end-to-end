@@ -25,6 +25,7 @@ goog.require('e2e.error.UnsupportedError');
 goog.require('e2e.ext.constants.Mime');
 goog.require('goog.array');
 goog.require('goog.crypt.base64');
+goog.require('goog.string');
 
 goog.scope(function() {
 var ext = e2e.ext;
@@ -46,25 +47,22 @@ ext.mime.utils.getEncryptedMimeTree = function(text) {
       ctHeader.params.protocol !== constants.Mime.ENCRYPTED ||
       !goog.isArray(rootNode.body)) {
     // This does not appear to be a valid PGP encrypted MIME message.
-    utils.fail_();
+    utils.fail_(text);
   } else {
     // Next node is the required 'application/pgp-encrypted' version node.
     var middleNode = rootNode.body[0];
-    ctHeader = middleNode.header[constants.Mime.CONTENT_TYPE];
-    if (ctHeader.value !== constants.Mime.ENCRYPTED ||
-        !goog.isArray(middleNode.body)) {
-      utils.fail_();
-    } else {
-      // Next node is the actual encrypted content.
-      var leafNode = middleNode.body[0];
-      ctHeader = leafNode.header[constants.Mime.CONTENT_TYPE];
-      if (ctHeader.value !== constants.Mime.OCTET_STREAM ||
-          !goog.isString(leafNode.body)) {
-        utils.fail_();
-      } else {
-        return leafNode.body;
-      }
+    var contentNode = rootNode.body[1];
+
+    if (middleNode.header[constants.Mime.CONTENT_TYPE].value !==
+          constants.Mime.ENCRYPTED ||
+        contentNode.header[constants.Mime.CONTENT_TYPE].value !==
+          constants.Mime.OCTET_STREAM ||
+        !goog.isString(contentNode.body) ||
+        !goog.isString(middleNode.body)) {
+      utils.fail_(text);
     }
+    // Next node is the actual encrypted content.
+    return contentNode.body;
   }
 };
 
@@ -94,10 +92,10 @@ ext.mime.utils.getMailContent = function(text) {
     goog.array.forEach(rootNode.body, goog.bind(function(node) {
       var ct = node.header[constants.Mime.CONTENT_TYPE].value;
       if (!goog.isString(node.body) || !ct) {
-        return;
+        utils.fail_(JSON.stringify(node));
       }
       if (ct === constants.Mime.PLAINTEXT) {
-        var text = utils.getContentFromTextNode_(node);
+        var text = node.body;
         mailContent.body = mailContent.body ?
             utils.joinLines_([mailContent.body, text]) :
             text;
@@ -105,8 +103,7 @@ ext.mime.utils.getMailContent = function(text) {
         try {
           mailContent.attachments.push(
               utils.getContentFromAttachmentNode_(node));
-        } catch (e) {
-        }
+        } catch (e) {}
       }
     }, this));
 
@@ -154,7 +151,9 @@ ext.mime.utils.getContentFromAttachmentNode_ = function(node) {
 ext.mime.utils.parseHeader_ = function(text) {
   var parsed = {};
   parsed[constants.Mime.CONTENT_TYPE] = {
-    value: constants.Mime.CONTENT_TYPE_DEFAULT};
+    value: constants.Mime.PLAINTEXT,
+    params: {charset: constants.Mime.ASCII}
+  };
 
   var headerLines = utils.splitLines_(text);
   goog.array.forEach(headerLines, goog.bind(function(line) {
@@ -165,8 +164,11 @@ ext.mime.utils.parseHeader_ = function(text) {
     if (firstPart.length < 2) {
       return;
     }
-    var name = firstPart.shift();
-    var value = firstPart.join('').toLowerCase().strip();
+    // Header names are not case sensitive. Normalize to TitleCase.
+    var name = goog.string.toTitleCase(firstPart.shift(), '-');
+    // Values are case insensitive acc. to RFC 2045. Normalize to lowercase.
+    var value = goog.string.stripQuotes(firstPart.join('').toLowerCase().trim(),
+                                        '"');
 
     var params = {};
     goog.array.forEach(parts, goog.bind(function(part) {
@@ -175,8 +177,10 @@ ext.mime.utils.parseHeader_ = function(text) {
       if (paramParts.length < 2) {
         return;
       }
+      // Parameter names are case insensitive acc. to RFC 2045.
       var paramName = paramParts.shift().toLowerCase();
-      params[paramName] = paramParts.join('').toLowerCase().strip();
+      params[paramName] = goog.string.stripQuotes(
+        paramParts.join('').trim(), '"');
     }, this));
 
     parsed[name] = {value: value, params: params};
@@ -187,10 +191,12 @@ ext.mime.utils.parseHeader_ = function(text) {
 
 /**
  * Handle failure to parse MIME content.
+ * @param {string=} opt_message The content that was not parseable
  * @private
  */
-ext.mime.utils.fail_ = function() {
-  throw new e2e.error.UnsupportedError('Unsupported MIME content');
+ext.mime.utils.fail_ = function(opt_message) {
+  var message = opt_message || '';
+  throw new e2e.error.UnsupportedError('Unsupported MIME content: ' +  message);
 };
 
 
@@ -227,16 +233,15 @@ ext.mime.utils.joinLines_ = function(lines) {
  */
 ext.mime.utils.splitNodes_ = function(text, boundary) {
   var lines = utils.splitLines_(text);
-  var startLocation = goog.array.indexOf(lines, '--' + boundary +
-                                         constants.Mime.CRLF);
+  var startLocation = goog.array.indexOf(lines, '--' + boundary);
   var endLocation = goog.array.indexOf(lines, '--' + boundary + '--');
   if (endLocation === -1 || startLocation === -1) {
-    utils.fail_();
+    utils.fail_(text);
   }
-  // Ignore the epilogue after the end boundary.
+  // Ignore the epilogue after the end boundary inclusive.
   lines = goog.array.slice(lines, 0, endLocation);
-  // Ignore the preamble before the first boundary occurrence.
-  lines = goog.array.slice(lines, startLocation);
+  // Ignore the preamble before the first boundary occurrence inclusive.
+  lines = goog.array.slice(lines, startLocation + 1);
 
   text = utils.joinLines_(lines);
   return text.split('--' + boundary + constants.Mime.CRLF);
@@ -251,14 +256,16 @@ ext.mime.utils.splitNodes_ = function(text, boundary) {
  * @private
  */
 ext.mime.utils.parseNode_ = function(text) {
+  // Normalize text by prepending with newline
+  text = constants.Mime.CRLF + text;
   // Header must be separated from body by an empty line
   var parts = text.split(constants.Mime.CRLF + constants.Mime.CRLF);
   if (parts.length < 2) {
-    utils.fail_();
+    utils.fail_(text);
   }
 
   var header = utils.parseHeader_(parts.shift());
-  var body = utils.joinLines_(parts);
+  var body = parts.join(constants.Mime.CRLF + constants.Mime.CRLF);
   var ctHeader = header[constants.Mime.CONTENT_TYPE];
   var parsed = {};
   parsed.header = header;
