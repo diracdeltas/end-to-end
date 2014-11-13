@@ -89,9 +89,7 @@ ext.mime.PgpMail.prototype.buildMimeTree_ = function(content) {
   if (!content.attachments || content.attachments.length === 0) {
     // Create a single plaintext node.
     rootNode = new mime.MimeNode({multipart: false,
-      contentType: constants.Mime.PLAINTEXT,
-      contentTransferEncoding:
-          constants.Mime.SEVEN_BIT});
+      contentType: constants.Mime.PLAINTEXT});
     rootNode.setContent(content.body);
   } else {
     // Create a multipart node with children for body and attachments.
@@ -99,8 +97,7 @@ ext.mime.PgpMail.prototype.buildMimeTree_ = function(content) {
       contentType: constants.Mime.MULTIPART_MIXED});
 
     var textNode = rootNode.addChild({multipart: false,
-      contentType: constants.Mime.PLAINTEXT,
-      contentTransferEncoding: constants.Mime.SEVEN_BIT});
+      contentType: constants.Mime.PLAINTEXT});
     textNode.setContent(content.body);
 
     goog.array.forEach(content.attachments, function(attachment) {
@@ -126,25 +123,16 @@ ext.mime.PgpMail.prototype.buildMimeTree_ = function(content) {
 ext.mime.PgpMail.prototype.buildEncryptedMimeTree_ = function(encrypted) {
   // Build the top-level node
   var rootNode = new mime.MimeNode({multipart: true,
-    contentType:
-        constants.Mime.DEFAULT_ENCRYPTED_CONTENT_TYPE,
-    contentTransferEncoding:
-        constants.Mime.SEVEN_BIT});
+    contentType: constants.Mime.DEFAULT_ENCRYPTED_CONTENT_TYPE});
 
   // Set the required version info.
   var versionNode = rootNode.addChild({multipart: false,
-    contentType:
-        constants.Mime.ENCRYPTED,
-    contentTransferEncoding:
-        constants.Mime.SEVEN_BIT});
+    contentType: constants.Mime.ENCRYPTED});
   versionNode.setContent(constants.Mime.VERSION_CONTENT);
 
   // Set the ciphertext
   var contentNode = rootNode.addChild({multipart: false,
-    contentType:
-        constants.Mime.OCTET_STREAM,
-    contentTransferEncoding:
-        constants.Mime.SEVEN_BIT});
+    contentType: constants.Mime.OCTET_STREAM});
   contentNode.setContent(encrypted);
 
   return rootNode.buildMessage();

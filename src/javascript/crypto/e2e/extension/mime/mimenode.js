@@ -57,10 +57,10 @@ ext.mime.MimeNode = function(options, opt_parent, opt_filename) {
 
   this.setHeader_(constants.Mime.CONTENT_TYPE, options.contentType);
 
-  if (options.contentTransferEncoding) {
-    this.setHeader_(constants.Mime.CONTENT_TRANSFER_ENCODING,
-                    options.contentTransferEncoding);
-  }
+  // Default content transfer encoding is 7bit, according to RFC 2045
+  var ctEncoding = options.contentTransferEncoding ?
+    options.contentTransferEncoding : constants.Mime.SEVEN_BIT;
+  this.setHeader_(constants.Mime.CONTENT_TRANSFER_ENCODING, ctEncoding);
 
   this.setBoundary_();
 };

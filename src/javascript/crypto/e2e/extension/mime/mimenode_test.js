@@ -40,6 +40,7 @@ var BINARY_CONTENT = '\x98\x8d\x04\x52\xb0\xe5\x09\x01\x04\x00\xd7\x6f\x47\x2e\x
 var TEXT_CONTENT = 'hi this is a\ntext message';
 var BOUNDARY = '--foo';
 var FINAL_MESSAGE = ['Content-Type: multipart/mixed; boundary="--foo"',
+  'Content-Transfer-Encoding: 7bit',
   '', '----foo', 'Content-Type: text/plain; charset="utf-8"',
   'Content-Transfer-Encoding: 7bit', '', TEXT_CONTENT, '----foo',
   'Content-Type: application/octet-stream',

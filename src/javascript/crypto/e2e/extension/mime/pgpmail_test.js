@@ -67,6 +67,7 @@ function testBuildSignedAndEncrypted() {
   var signer = 'yan@mit.edu';
   var signMessage = true;
   var plaintextMimetree = ['Content-Type: multipart/mixed; boundary="--foo"',
+    'Content-Transfer-Encoding: 7bit',
     '', '----foo', 'Content-Type: text/plain; charset="utf-8"',
     'Content-Transfer-Encoding: 7bit', '', TEXT_CONTENT, '----foo',
     'Content-Type: application/octet-stream',
