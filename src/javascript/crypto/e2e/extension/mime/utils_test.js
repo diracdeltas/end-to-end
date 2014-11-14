@@ -132,3 +132,8 @@ function testGetInvalidEncryptedMimeTree() {
                  utils.getEncryptedMimeTree(PLAINTEXT_MESSAGE);
                });
 }
+
+
+function testParseHeaderValue() {
+  var text = ['MULTIPART_mixed; BOUNARY="foo"'];
+}

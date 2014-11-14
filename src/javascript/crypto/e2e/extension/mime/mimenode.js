@@ -22,6 +22,7 @@
 goog.provide('e2e.ext.mime.MimeNode');
 
 goog.require('e2e.ext.constants.Mime');
+goog.require('e2e.ext.mime.utils');
 goog.require('goog.array');
 goog.require('goog.crypt.base64');
 goog.require('goog.object');
@@ -51,7 +52,7 @@ ext.mime.MimeNode = function(options, opt_parent, opt_filename) {
 
   this.multipart_ = options.multipart;
   this.children_ = [];
-  this.headers_ = {};
+  this.header_ = /** @type {e2e.ext.mime.types.Header} */ ({});
   this.content_ = null;
   this.boundary_ = '';
 
@@ -98,38 +99,18 @@ ext.mime.MimeNode.prototype.addChild = function(options, opt_filename) {
 /**
  * Sets a MIME header.
  * @param {string} key Name of the header.
- * @param {string} value Value of the header.
+ * @param {string} value Value of the header, possibly including parameters.
+ * @param {Object.<string, string>=} opt_params Optional dict of additional
+ *   parameters
  * @private
  */
-ext.mime.MimeNode.prototype.setHeader_ = function(key, value) {
-  goog.object.set(this.headers_, key, value);
-};
-
-
-/**
- * Adds parameters to a MIME header. Note: This will not replace a param
- *   if it already exists.
- * @param {string} headerName The name of the header.
- * @param {Object} params The parameter key-value pairs to add.
- * @param {string} value Default value of the header if one doesn't exist.
- * @private
- */
-ext.mime.MimeNode.prototype.addHeaderParams_ = function(headerName, params,
-                                                        value) {
-  value = goog.object.get(this.headers_, headerName, value);
-
-  var paramsArray = [];
-  goog.object.forEach(params, function(paramValue, paramName) {
-    // TODO: Replace with RFC 2231 compliant encoding.
-    paramsArray.push(paramName + '=' + goog.string.quote(paramValue));
-  });
-
-  if (paramsArray.length !== 0) {
-    value = value + '; ' + paramsArray.join('; ');
+ext.mime.MimeNode.prototype.setHeader_ = function(key, value, opt_params) {
+  var headerValue = ext.mime.utils.parseHeaderValue(value);
+  if (opt_params) {
+    headerValue.params = headerValue.params || {};
+    goog.object.extend(headerValue.params, opt_params);
   }
-
-  this.setHeader_(headerName, value);
-
+  goog.object.set(this.header_, key, headerValue);
 };
 
 
@@ -148,36 +129,31 @@ ext.mime.MimeNode.prototype.setContent = function(content) {
  */
 ext.mime.MimeNode.prototype.buildMessage = function() {
   var lines = [];
-  var contentParams = {};
   var transferEncoding =
-      this.headers_[constants.Mime.CONTENT_TRANSFER_ENCODING];
-  var contentType = this.headers_[constants.Mime.CONTENT_TYPE];
+      this.header_[constants.Mime.CONTENT_TRANSFER_ENCODING];
+  var contentType = this.header_[constants.Mime.CONTENT_TYPE];
 
   // Set required header fields
-  if (this.filename && !this.headers_[constants.Mime.CONTENT_DISPOSITION]) {
+  if (this.filename && !this.header_[constants.Mime.CONTENT_DISPOSITION]) {
     // Set the correct content disposition header for attachments.
-    this.addHeaderParams_(constants.Mime.CONTENT_DISPOSITION,
-                          {filename: this.filename},
-                          constants.Mime.ATTACHMENT);
+    this.setHeader_(constants.Mime.CONTENT_DISPOSITION,
+                    constants.Mime.ATTACHMENT,
+                    {filename: this.filename});
   } else if (this.content_ && goog.typeOf(this.content_) === 'string') {
     // TODO: Support other charsets.
-    contentParams.charset = constants.Mime.UTF8;
+    contentType.params.charset = constants.Mime.UTF8;
   } else if (this.multipart_) {
     // Multipart messages need to specify a boundary
-    contentParams.boundary = this.boundary_;
+    contentType.params.boundary = this.boundary_;
   }
-  this.addHeaderParams_(constants.Mime.CONTENT_TYPE, contentParams,
-                        contentType);
 
-  goog.object.forEach(this.headers_, function(headerValue, headerName) {
-    // TODO: Wrap lines at 76 chars
-    lines.push([headerName, headerValue].join(': '));
-  });
+  // TODO: Wrap header lines at 76 chars
+  lines = lines.concat(ext.mime.utils.serializeHeader(this.header_));
 
   lines.push('');
 
   if (this.content_) {
-    if (transferEncoding === constants.Mime.BASE64 ||
+    if (transferEncoding.value === constants.Mime.BASE64 ||
         goog.typeOf(this.content_) !== 'string') {
       // TODO: Wrap lines at 76 chars
       lines.push(goog.typeOf(this.content_) === 'string' ?

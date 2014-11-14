@@ -73,7 +73,7 @@ function testNodeSetup() {
   assertEquals(BOUNDARY, node.boundary_);
   assertTrue(node.multipart_);
   assertEquals(constants.Mime.MULTIPART_MIXED,
-               node.headers_[constants.Mime.CONTENT_TYPE]);
+               node.header_[constants.Mime.CONTENT_TYPE].value);
 }
 
 
@@ -84,7 +84,7 @@ function testAddChild() {
   assertEquals(filename, child.filename);
   assertEquals(node, child.parent);
   assertEquals(constants.Mime.ENCRYPTED,
-               child.headers_[constants.Mime.CONTENT_TYPE]);
+               child.header_[constants.Mime.CONTENT_TYPE].value);
 }
 
 
@@ -96,8 +96,7 @@ function testSetContent() {
 
 function testBuildMessage() {
   var childTextNode = node.addChild({contentType: constants.Mime.PLAINTEXT,
-    multipart: false,
-    contentTransferEncoding: constants.Mime.SEVEN_BIT});
+    multipart: false});
   childTextNode.setContent(TEXT_CONTENT);
   var childAttachmentNode = node.addChild({
     contentType: constants.Mime.OCTET_STREAM,

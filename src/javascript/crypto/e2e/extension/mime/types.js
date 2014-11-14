@@ -22,6 +22,7 @@
 goog.provide('e2e.ext.mime.types.Attachment');
 goog.provide('e2e.ext.mime.types.Entity');
 goog.provide('e2e.ext.mime.types.Header');
+goog.provide('e2e.ext.mime.types.HeaderValue');
 goog.provide('e2e.ext.mime.types.MailContent');
 
 
@@ -40,10 +41,15 @@ e2e.ext.mime.types.Attachment;
 
 
 /**
- * @typedef {Object.<string, {value: string,
- *     params: (!Object.<string, string>|undefined)}>}
+ * @typedef {Object.<string, e2e.ext.mime.types.HeaderValue>}
  */
 e2e.ext.mime.types.Header;
+
+
+/**
+ * @typedef {{value: string, params: (!Object.<string, string>|undefined)}}
+ */
+e2e.ext.mime.types.HeaderValue;
 
 
 /**

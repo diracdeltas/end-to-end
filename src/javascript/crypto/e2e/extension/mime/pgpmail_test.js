@@ -75,7 +75,7 @@ function testBuildSignedAndEncrypted() {
     'Content-Disposition: attachment; filename="example.txt"', '',
     'mI0EUrDlCQEEANdvRy4NGBqE20LkN4aw71CFL1LsiUPZyNxCMtnFsRMGEsLDIUHGWKD6N7miPidWnFJ0NI+uj6quKlKbr+6vXaMnv9YhiTLSRo/MNfcK9yEp5F5BZE0wsr21f8NfvIN1Ki/LXWH6HtTY6yxiJv0SBtRFPM9b9TD8c82AtZ4FzZITABEBAAG0GnRlc3QgNSA8dGVzdDVAZXhhbXBsZS5jb20+iLgEEwECACIFAlKw5QkCGwMGCwkIBwMCBhUIAgkKCwQWAgMBAh4BAheAAAoJEDpMhuXjFtfrYm4D/0l0ciAz44fQ86s6Mt0vkkmxRw2wNbpxaH5NUoHejgfdUqze8Pq9W0CB2VkSQmg8bcI4tMfSmuYpsDtYK1jtdwiWGrWApqZIHe588zaT6iDPC877qG/ST+nUcFN+iGwNc7dxqJFEo8a8xwWgcZFI6VAoyPA39oBdWZPQRa+0t3OSuI0EUrDlCQEEAJ0MRSLSOWD4Tmfu6kAB7a4PpCw/vpGVxkcFfLEi22VxAlrcoCCU33p9RJTQZNVYHFezBZUdE8exHkz+C1wAwlcdI1KaFybXFqb05Q/+FTngWm7X9C4ZZ0Ylf7lEXuhJ5HFuNjB/WYo9EFL0GNZtuCUEhPgy/IrikWw8fjsmhoALABEBAAGInwQYAQIACQUCUrDlCQIbDAAKCRA6TIbl4xbX69ZnA/97iK25jcFFD136qlOWW2i2fn129fFGUg/P1l6EZeHvLcLGaKqFZb2i68tmIza1xl9+yTHlHYifxQnpEMS+/CaPGSUVVP+rdlYn7zkk3z4iAi1+pGb56mYWiVLH2LeQTwVnl+d5V0qi1D2tPxCBbs/g/2EO5l3ZfuEnwjYgLr5D1w==',
     '----foo--', ''].join('\r\n');
-  var finalTree = ['Content-Type: multipart/encrypted; protocol=application/pgp-encrypted; boundary="--foo"',
+  var finalTree = ['Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary="--foo"',
     'Content-Transfer-Encoding: 7bit', '', '----foo',
     'Content-Type: application/pgp-encrypted; charset="utf-8"',
     'Content-Transfer-Encoding: 7bit', '', 'Version: 1', '----foo',

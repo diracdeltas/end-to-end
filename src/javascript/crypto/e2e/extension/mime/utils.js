@@ -25,6 +25,7 @@ goog.require('e2e.error.UnsupportedError');
 goog.require('e2e.ext.constants.Mime');
 goog.require('goog.array');
 goog.require('goog.crypt.base64');
+goog.require('goog.object');
 goog.require('goog.string');
 
 goog.scope(function() {
@@ -143,31 +144,16 @@ ext.mime.utils.getContentFromAttachmentNode_ = function(node) {
 
 
 /**
- * Parses MIME headers into a dict.
- * @param {string} text The MIME-formatted message.
- * @return {e2e.ext.mime.types.Header}
- * @private
+ * Parses a header value string. Ex: 'multipart/mixed; boundary="foo"'
+ * @param {string} text The string to parse
+ * @return {e2e.ext.mime.types.HeaderValue}
  */
-ext.mime.utils.parseHeader_ = function(text) {
-  var parsed = {};
-  parsed[constants.Mime.CONTENT_TYPE] = {
-    value: constants.Mime.PLAINTEXT,
-    params: {charset: constants.Mime.ASCII}
-  };
+ext.mime.utils.parseHeaderValue = function(text) {
+    var parts = text.split('; ');
+    var firstPart = parts.shift();
 
-  var headerLines = utils.splitLines_(text);
-  goog.array.forEach(headerLines, goog.bind(function(line) {
-    var parts = line.split('; ');
-
-    // Ex: 'Content-Type: multipart/encrypted'
-    var firstPart = parts.shift().split(':');
-    if (firstPart.length < 2) {
-      return;
-    }
-    // Header names are not case sensitive. Normalize to TitleCase.
-    var name = goog.string.toTitleCase(firstPart.shift(), '-');
-    // Values are case insensitive acc. to RFC 2045. Normalize to lowercase.
-    var value = goog.string.stripQuotes(firstPart.join('').toLowerCase().trim(),
+    // Normalize value to lowercase since it's case insensitive
+    var value = goog.string.stripQuotes(firstPart.toLowerCase().trim(),
                                         '"');
 
     var params = {};
@@ -180,10 +166,62 @@ ext.mime.utils.parseHeader_ = function(text) {
       // Parameter names are case insensitive acc. to RFC 2045.
       var paramName = paramParts.shift().toLowerCase();
       params[paramName] = goog.string.stripQuotes(
-        paramParts.join('').trim(), '"');
+        paramParts.join('=').trim(), '"');
     }, this));
 
-    parsed[name] = {value: value, params: params};
+    return {value: value, params: params};
+};
+
+
+/**
+ * Serialize a header into an array of strings.
+ * @param {e2e.ext.mime.types.Header} header The header to serialize
+ * @return {Array.<string>}
+ */
+ext.mime.utils.serializeHeader = function(header) {
+  var lines = [];
+  goog.object.forEach(header, function(headerValue, headerName) {
+    var line = [headerName + ': ' + headerValue.value];
+    goog.object.forEach(headerValue.params, function(paramValue, paramName) {
+      line.push(paramName + '=' + goog.string.quote(paramValue));
+    });
+    lines.push(line.join('; '));
+  });
+  return lines;
+};
+
+
+/**
+ * Parses MIME headers into a dict, optionally extending existing headers.
+ * @param {string} text The MIME-formatted header.
+ * @param {e2e.ext.mime.types.Header} opt_header An optional header to extend.
+ * @return {e2e.ext.mime.types.Header}
+ */
+ext.mime.utils.parseHeader = function(text, opt_header) {
+  var parsed = opt_header || {};
+
+  // Implicit content-type is ASCII plaintext (RFC 2045)
+  goog.object.setIfUndefined(parsed, constants.Mime.CONTENT_TYPE, {
+    value: constants.Mime.PLAINTEXT,
+    params: {charset: constants.Mime.ASCII}
+  });
+  // Implicit content-transfer-encoding is 7bit (RFC 2045)
+  goog.object.setIfUndefined(parsed, constants.Mime.CONTENT_TRANSFER_ENCODING, {
+    value: constants.Mime.SEVEN_BIT
+  });
+
+  var headerLines = utils.splitLines_(text);
+  goog.array.forEach(headerLines, goog.bind(function(line) {
+    // Ex: 'Content-Type: multipart/encrypted'
+    var parts = line.split(':');
+    if (parts.length < 2) {
+      return;
+    }
+
+    // Header names are not case sensitive. Normalize to TitleCase.
+    var name = goog.string.toTitleCase(parts.shift(), '-');
+    var value = utils.parseHeaderValue(parts.join(':'));
+    parsed[name] = value;
   }, this));
   return parsed;
 };
@@ -264,7 +302,7 @@ ext.mime.utils.parseNode_ = function(text) {
     utils.fail_(text);
   }
 
-  var header = utils.parseHeader_(parts.shift());
+  var header = utils.parseHeader(parts.shift());
   var body = parts.join(constants.Mime.CRLF + constants.Mime.CRLF);
   var ctHeader = header[constants.Mime.CONTENT_TYPE];
   var parsed = {};
