@@ -60,7 +60,7 @@ ext.mime.MimeNode = function(options, opt_parent, opt_filename) {
 
   // Default content transfer encoding is 7bit, according to RFC 2045
   var ctEncoding = options.contentTransferEncoding ?
-    options.contentTransferEncoding : constants.Mime.SEVEN_BIT;
+      options.contentTransferEncoding : constants.Mime.SEVEN_BIT;
   this.setHeader_(constants.Mime.CONTENT_TRANSFER_ENCODING, ctEncoding);
 
   this.setBoundary_();
@@ -142,7 +142,7 @@ ext.mime.MimeNode.prototype.buildMessage = function() {
   } else if (this.content_ && goog.typeOf(this.content_) === 'string') {
     // TODO: Support other charsets.
     contentType.params.charset = contentType.params.charset ||
-      constants.Mime.UTF8;
+        constants.Mime.UTF8;
   } else if (this.multipart_) {
     // Multipart messages need to specify a boundary
     contentType.params.boundary = this.boundary_;

@@ -55,9 +55,9 @@ ext.mime.utils.getEncryptedMimeTree = function(text) {
     var contentNode = rootNode.body[1];
 
     if (middleNode.header[constants.Mime.CONTENT_TYPE].value !==
-          constants.Mime.ENCRYPTED ||
+        constants.Mime.ENCRYPTED ||
         contentNode.header[constants.Mime.CONTENT_TYPE].value !==
-          constants.Mime.OCTET_STREAM ||
+        constants.Mime.OCTET_STREAM ||
         !goog.isString(contentNode.body) ||
         !goog.isString(middleNode.body)) {
       utils.fail_(text);
@@ -149,27 +149,27 @@ ext.mime.utils.parseAttachmentEntity_ = function(node) {
  * @return {e2e.ext.mime.types.HeaderValue}
  */
 ext.mime.utils.parseHeaderValue = function(text) {
-    var parts = text.split('; ');
-    var firstPart = parts.shift();
+  var parts = text.split('; ');
+  var firstPart = parts.shift();
 
-    // Normalize value to lowercase since it's case insensitive
-    var value = goog.string.stripQuotes(firstPart.toLowerCase().trim(),
-                                        '"');
+  // Normalize value to lowercase since it's case insensitive
+  var value = goog.string.stripQuotes(firstPart.toLowerCase().trim(),
+                                      '"');
 
-    var params = {};
-    goog.array.forEach(parts, goog.bind(function(part) {
-      // Ex: 'protocol=application/pgp-encrypted'
-      var paramParts = part.split('=');
-      if (paramParts.length < 2) {
-        return;
-      }
-      // Parameter names are case insensitive acc. to RFC 2045.
-      var paramName = paramParts.shift().toLowerCase().trim();
-      params[paramName] = goog.string.stripQuotes(
+  var params = {};
+  goog.array.forEach(parts, goog.bind(function(part) {
+    // Ex: 'protocol=application/pgp-encrypted'
+    var paramParts = part.split('=');
+    if (paramParts.length < 2) {
+      return;
+    }
+    // Parameter names are case insensitive acc. to RFC 2045.
+    var paramName = paramParts.shift().toLowerCase().trim();
+    params[paramName] = goog.string.stripQuotes(
         paramParts.join('=').trim(), '"');
-    }, this));
+  }, this));
 
-    return {value: value, params: params};
+  return {value: value, params: params};
 };
 
 
@@ -234,7 +234,7 @@ ext.mime.utils.parseHeader_ = function(text) {
  */
 ext.mime.utils.fail_ = function(opt_message) {
   var message = opt_message || '';
-  throw new e2e.error.UnsupportedError('Unsupported MIME content: ' +  message);
+  throw new e2e.error.UnsupportedError('Unsupported MIME content: ' + message);
 };
 
 

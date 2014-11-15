@@ -115,7 +115,8 @@ function testGetSinglePartMailContent() {
 
 function testGetValidEncryptedMImeTree() {
   var encryptedText = 'some text';
-  var message = ['Content-Type: multipart/encrypted; protocol=application/pgp-encrypted; boundary="--foo"',
+  var message = ['Content-Type: multipart/encrypted; ' +
+        'protocol=application/pgp-encrypted; boundary="--foo"',
     'Content-Transfer-Encoding: 7bit', '', '----foo',
     'Content-Type: application/pgp-encrypted; charset="utf-8"',
     'Content-Transfer-Encoding: 7bit', '', 'Version: 1', '----foo',
