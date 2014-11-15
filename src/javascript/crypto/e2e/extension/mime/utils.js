@@ -103,7 +103,7 @@ ext.mime.utils.getMailContent = function(text) {
       } else if (ct === constants.Mime.OCTET_STREAM) {
         try {
           mailContent.attachments.push(
-              utils.getContentFromAttachmentNode_(node));
+              utils.parseAttachmentEntity_(node));
         } catch (e) {}
       }
     }, this));
@@ -122,7 +122,7 @@ ext.mime.utils.getMailContent = function(text) {
  * @return {e2e.ext.mime.types.Attachment}
  * @private
  */
-ext.mime.utils.getContentFromAttachmentNode_ = function(node) {
+ext.mime.utils.parseAttachmentEntity_ = function(node) {
   var filename;
   var base64 = false;
 
@@ -164,7 +164,7 @@ ext.mime.utils.parseHeaderValue = function(text) {
         return;
       }
       // Parameter names are case insensitive acc. to RFC 2045.
-      var paramName = paramParts.shift().toLowerCase();
+      var paramName = paramParts.shift().toLowerCase().trim();
       params[paramName] = goog.string.stripQuotes(
         paramParts.join('=').trim(), '"');
     }, this));
@@ -194,11 +194,11 @@ ext.mime.utils.serializeHeader = function(header) {
 /**
  * Parses MIME headers into a dict, optionally extending existing headers.
  * @param {string} text The MIME-formatted header.
- * @param {e2e.ext.mime.types.Header} opt_header An optional header to extend.
  * @return {e2e.ext.mime.types.Header}
+ * @private
  */
-ext.mime.utils.parseHeader = function(text, opt_header) {
-  var parsed = opt_header || {};
+ext.mime.utils.parseHeader_ = function(text) {
+  var parsed = {};
 
   // Implicit content-type is ASCII plaintext (RFC 2045)
   goog.object.setIfUndefined(parsed, constants.Mime.CONTENT_TYPE, {
@@ -302,7 +302,7 @@ ext.mime.utils.parseNode_ = function(text) {
     utils.fail_(text);
   }
 
-  var header = utils.parseHeader(parts.shift());
+  var header = utils.parseHeader_(parts.shift());
   var body = parts.join(constants.Mime.CRLF + constants.Mime.CRLF);
   var ctHeader = header[constants.Mime.CONTENT_TYPE];
   var parsed = {};

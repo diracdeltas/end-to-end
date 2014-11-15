@@ -32,6 +32,7 @@ goog.setTestOnly();
 var utils = e2e.ext.mime.utils;
 var stubs = new goog.testing.PropertyReplacer();
 
+
 var PLAINTEXT_MESSAGE = ['From: Nathaniel Borenstein <nsb@bellcore.com>',
   'To:  Ned Freed <ned@innosoft.com>',
   'Subject: Sample message',
@@ -58,7 +59,7 @@ var PLAINTEXT_MESSAGE = ['From: Nathaniel Borenstein <nsb@bellcore.com>',
   'Content-Transfer-Encoding: base64',
   'Content-Disposition: attachment; filename="foo.txt"',
   '',
-  ATTACHMENT_BODY,
+  'aGVsbG8gd29ybGQK',
   '--simple boundary--',
   'This is the epilogue.  It is also to be ignored.'].join('\r\n');
 
@@ -70,8 +71,6 @@ var PLAINTEXT_BODY = ['This is implicitly typed plain ASCII text.',
   'It DOES end with a linebreak.',
   '',
   ''].join('\r\n');
-
-var ATTACHMENT_BODY = 'aGVsbG8gd29ybGQK';
 
 
 function setUp() {
@@ -90,6 +89,7 @@ function testGetMultipartMailContent() {
   });
   var finalContent = {body: PLAINTEXT_BODY,
     attachments: [{filename: 'foo.txt', content: content}]};
+
   assertObjectEquals(finalContent, utils.getMailContent(PLAINTEXT_MESSAGE));
 }
 
@@ -135,5 +135,19 @@ function testGetInvalidEncryptedMimeTree() {
 
 
 function testParseHeaderValue() {
-  var text = ['MULTIPART_mixed; BOUNARY="foo"'];
+  var text = 'MULTIPART/mixed;   BOUNDARY=" foo=";  bar=somevalue';
+  assertObjectEquals({value: 'multipart/mixed', params: {
+    boundary: ' foo=',
+    bar: 'somevalue'
+  }}, utils.parseHeaderValue(text));
+}
+
+
+function testSerializeHeader() {
+  var header = {'Content-Type': {value: 'multipart', params: {
+    charset: 'us-ascii',
+    foo: 'bar='
+  }}, 'Content-Transfer-Encoding': {value: '7bit'}};
+  assertArrayEquals(['Content-Type: multipart; charset="us-ascii"; foo="bar="',
+    'Content-Transfer-Encoding: 7bit'], utils.serializeHeader(header));
 }

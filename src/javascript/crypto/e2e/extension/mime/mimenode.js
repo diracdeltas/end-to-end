@@ -141,7 +141,8 @@ ext.mime.MimeNode.prototype.buildMessage = function() {
                     {filename: this.filename});
   } else if (this.content_ && goog.typeOf(this.content_) === 'string') {
     // TODO: Support other charsets.
-    contentType.params.charset = constants.Mime.UTF8;
+    contentType.params.charset = contentType.params.charset ||
+      constants.Mime.UTF8;
   } else if (this.multipart_) {
     // Multipart messages need to specify a boundary
     contentType.params.boundary = this.boundary_;
