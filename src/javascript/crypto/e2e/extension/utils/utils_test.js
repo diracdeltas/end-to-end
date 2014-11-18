@@ -86,6 +86,25 @@ function testRead() {
 }
 
 
+function testReadFilelist() {
+  var blob1 = new Blob(['foo'], {type: 'text/plain'});
+  blob1.name = 'foo.txt';
+  var blob2 = new Blob(['bar'], {type: 'text/plain'});
+  blob2.name = 'bar.txt';
+  var filelist = {items: [blob1, blob2]};
+  filelist.length = filelist.items.length;
+  stubs.set(filelist, 'item', function(i) {
+    return filelist.items[i];
+  });
+
+  testCase.waitForAsync('waiting for files to be read');
+  utils.readFilelist(filelist, function(attachments) {
+    assertArrayEquals([{filename: 'foo.txt', content: [126, 138]},
+        {filename: 'bar.txt', content: [109, 170]}], attachments);
+    testCase.continueTesting();
+  });
+}
+
 function testShowNotification() {
   var delayedCb = new goog.testing.mockmatchers.SaveArgument(goog.isFunction);
   stubs.replace(window, 'setTimeout', mockControl.createFunctionMock());

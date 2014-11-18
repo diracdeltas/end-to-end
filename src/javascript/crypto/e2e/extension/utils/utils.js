@@ -23,6 +23,7 @@ goog.provide('e2e.ext.utils.Error');
 
 goog.require('e2e.ext.constants');
 goog.require('e2e.ext.constants.ElementId');
+goog.require('goog.crypt.base64');
 
 goog.scope(function() {
 var constants = e2e.ext.constants;
@@ -30,14 +31,16 @@ var utils = e2e.ext.utils;
 
 
 /**
- * Creates a blob URL to download a file.
+ * Creates a blob URL to download a file. Default content type is
+ * application/pgp-keys.
  * @param {string} content The content to write to the new file.
  * @param {!function(string)} callback The callback to invoke with the URL of
  *     the created file.
+ * @param {string=} opt_type The MIME content type of the file
  */
-utils.writeToFile = function(content, callback) {
-  var blob = new Blob(
-      [content], {type: 'application/pgp-keys; format=text;'});
+utils.writeToFile = function(content, callback, opt_type) {
+  var type = opt_type || constants.Mime.KEYS;
+  var blob = new Blob([content], {type: type});
   var url = URL.createObjectURL(blob);
   callback(url);
 };
@@ -45,7 +48,9 @@ utils.writeToFile = function(content, callback) {
 
 /**
  * Reads the contents of the provided file returns it via the provided callback.
- * Automatically handles both binary OpenPGP packets and text files.
+ * Automatically handles both binary OpenPGP packets and text files. Specify
+ * the opt_binary flag to read a file as binary even if it is not an OpenPGP
+ * packet.
  * @param {!File} file The file to read.
  * @param {!function(string)} callback The callback to invoke with the file's
  *     contents.
@@ -59,6 +64,33 @@ utils.readFile = function(file, callback) {
       utils.readFile_(true, file, callback);
     }
   });
+};
+
+
+/**
+ * Reads each file in a filelist as an Attachment object and executes the
+ * provided callback when all reads have finished.
+ * @param {!FileList} filelist the filelist to read
+ * @param {!function(Array.<e2e.ext.mime.types.Attachment>)}
+ */
+utils.readFilelist = function(filelist, callback) {
+  var attachments = [];
+  var file;
+  if (!filelist.length) {
+    callback(attachments);
+  } else {
+    var fileCallback = function(filename, fileContent) {
+      attachments.push({filename: filename,
+          content: goog.crypt.base64.decodeStringToByteArray(fileContent)});
+      if (attachments.length === filelist.length) {
+        callback(attachments);
+      }
+    };
+    for (var i = 0; i < filelist.length; i++) {
+      file = filelist.item(i);
+      utils.readFile_(false, file, goog.bind(fileCallback, this, file.name));
+    }
+  }
 };
 
 
