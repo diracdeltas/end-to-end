@@ -24,6 +24,7 @@ goog.require('e2e.ext.constants');
 goog.require('e2e.ext.constants.Actions');
 goog.require('e2e.ext.constants.CssClass');
 goog.require('e2e.ext.constants.ElementId');
+goog.require('e2e.ext.mime.PgpMail');
 goog.require('e2e.ext.ui.dialogs.Generic');
 goog.require('e2e.ext.ui.dialogs.InputType');
 goog.require('e2e.ext.ui.draftmanager');
@@ -34,6 +35,7 @@ goog.require('e2e.ext.ui.preferences');
 goog.require('e2e.ext.ui.templates.panels.prompt');
 goog.require('e2e.ext.utils.action');
 goog.require('e2e.ext.utils.text');
+goog.require('e2e.ext.utils');
 goog.require('e2e.openpgp.asciiArmor');
 goog.require('goog.Timer');
 goog.require('goog.array');
@@ -347,37 +349,45 @@ promptPanels.EncryptSign.prototype.encryptSign_ = function() {
   var textArea = /** @type {HTMLTextAreaElement} */
       (this.getElement().querySelector('textarea'));
   var origin = this.getContent().origin;
-  var request = /** @type {!messages.ApiRequest} */ ({
-    action: constants.Actions.ENCRYPT_SIGN,
-    content: textArea.value,
-    currentUser: goog.dom.getElement(constants.ElementId.SIGNER_SELECT).value
-  });
+  var files = goog.dom.getElement(constants.ElementId.FILE_UPLOAD_DIV).
+      querySelector('input').files;
 
-  if (this.chipHolder_) {
-    request.recipients = this.chipHolder_.getSelectedUids();
-    request.encryptPassphrases = this.chipHolder_.getProvidedPassphrases();
-  }
-
-  var signerCheck = goog.dom.getElement(constants.ElementId.SIGN_MESSAGE_CHECK);
-  request.signMessage = signerCheck && signerCheck.checked;
-
-  this.actionExecutor_.execute(request, this, goog.bind(function(encrypted) {
-    textArea.disabled = true;
-    textArea.value = encrypted;
-    this.chipHolder_.lock();
-    var passphraseEncryptionLink = goog.dom.getElement(
-        constants.ElementId.PASSPHRASE_ENCRYPTION_LINK);
-    goog.dom.classlist.add(
-        passphraseEncryptionLink, constants.CssClass.INVISIBLE);
-    var signCheckbox = goog.dom.getElement(
-        constants.ElementId.SIGN_MESSAGE_CHECK);
-    signCheckbox.disabled = true;
-    this.clearSavedDraft_(origin);
-    this.renderDismiss();
-    var insertButton = this.getElementByClass(constants.CssClass.INSERT);
-    if (insertButton) {
-      goog.dom.classlist.remove(insertButton, constants.CssClass.HIDDEN);
+  utils.readFilelist(files, goog.bind(function(attachments) {
+    var options = {};
+    var content = /** @type {e2e.ext.mime.types.MailContent} */
+        ({body: textArea.value, attachments: attachments});
+    options.currentUser =
+        goog.dom.getElement(constants.ElementId.SIGNER_SELECT).value;
+    if (this.chipHolder_) {
+      options.recipients = this.chipHolder_.getSelectedUids();
+      options.encryptPassphrases = this.chipHolder_.getProvidedPassphrases();
     }
+    var signerCheck =
+      goog.dom.getElement(constants.ElementId.SIGN_MESSAGE_CHECK);
+    options.signMessage = signerCheck && signerCheck.checked;
+    var pgpMail = new e2e.ext.mime.PgpMail(content, this.actionExecutor_,
+                                           options.currentUser,
+                                           options.signMessage,
+                                           options.recipients,
+                                           options.encryptPassphrases);
+    pgpMail.buildSignedAndEncrypted(goog.bind(function(encrypted) {
+      textArea.disabled = true;
+      textArea.value = encrypted;
+      this.chipHolder_.lock();
+      var passphraseEncryptionLink = goog.dom.getElement(
+          constants.ElementId.PASSPHRASE_ENCRYPTION_LINK);
+      goog.dom.classlist.add(
+          passphraseEncryptionLink, constants.CssClass.INVISIBLE);
+      var signCheckbox = goog.dom.getElement(
+          constants.ElementId.SIGN_MESSAGE_CHECK);
+      signCheckbox.disabled = true;
+      this.clearSavedDraft_(origin);
+      this.renderDismiss();
+      var insertButton = this.getElementByClass(constants.CssClass.INSERT);
+      if (insertButton) {
+        goog.dom.classlist.remove(insertButton, constants.CssClass.HIDDEN);
+      }
+    }, this));
   }, this));
 };
 

@@ -85,6 +85,7 @@ e2e.ext.constants.ElementId = {
   PASSPHRASE_ENCRYPTION_LINK: 'passphraseEncryptionLink',
   FROM_HOLDER: 'fromHolder',
   SUBJECT_HOLDER: 'subjectHolder',
+  FILE_UPLOAD_DIV: 'fileUploadDiv',
 
   /* Used to display menus in the UI. */
   MENU_CONTAINER: 'menu-container',
@@ -253,6 +254,8 @@ e2e.ext.constants.Mime = {
   MULTIPART_MIXED: 'multipart/mixed',
   DEFAULT_ENCRYPTED_CONTENT_TYPE:
       'multipart/encrypted; protocol=application/pgp-encrypted',
+  KEYS: 'application/pgp-keys; format=text',
+  SIGNATURE: 'application/pgp-signature',
 
   // Content Transfer Encodings
   SEVEN_BIT: '7bit',

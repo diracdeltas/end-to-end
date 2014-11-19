@@ -282,6 +282,8 @@ var PUBLIC_KEY_ASCII_2_EVIL = // Evil Drew Hintz <adhintz@google.com.evil.com>
 
 function testEncrypt() {
   var plaintext = 'plaintext message';
+  var plaintextMsg = ['Content-Type: text/plain; charset="utf-8"',
+      'Content-Transfer-Encoding: 7bit', '', plaintext].join('\r\n');
   var encrypted = 'encrypted message';
 
   var encryptCb = new goog.testing.mockmatchers.SaveArgument(goog.isFunction);
@@ -290,7 +292,7 @@ function testEncrypt() {
   e2e.ext.actions.EncryptSign.prototype.execute(
       goog.testing.mockmatchers.ignoreArgument,
       new goog.testing.mockmatchers.ArgumentMatcher(function(arg) {
-        assertEquals(plaintext, arg.content);
+        assertEquals(plaintextMsg, arg.content);
         return true;
       }),
       goog.testing.mockmatchers.ignoreArgument,
@@ -313,6 +315,17 @@ function testEncrypt() {
     recipients: [USER_ID]
   }, constants.Actions.ENCRYPT_SIGN);
   goog.dom.getElement(constants.ElementId.SIGN_MESSAGE_CHECK).checked = true;
+
+  var blob1 = new Blob(['foo'], {type: 'text/plain'});
+  blob1.name = 'foo.txt';
+  var blob2 = new Blob(['bar'], {type: 'text/plain'});
+  blob2.name = 'bar.txt';
+  var filelist = {items: [blob1, blob2]};
+  filelist.length = filelist.items.length;
+  stubs.set(filelist, 'item', function(i) {
+    return filelist.items[i];
+  });
+  goog.dom.getElement('fileUploadDiv').querySelector('input').files = filelist;
 
   var protectBtn = document.querySelector('button.action');
   protectBtn.click();
